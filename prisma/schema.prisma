@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("member") // "admin" | "member"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignedDeals Deal[]
+  activities    Activity[]
+}
+
+model Tier {
+  id       String    @id @default(cuid())
+  label    String    @unique // default: "T1", "T2", "T3" — renamable
+  order    Int
+  contacts Contact[]
+}
+
+model Tag {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  color       String       @default("#6366f1")
+  contactTags ContactTag[]
+}
+
+model Contact {
+  id               String     @id @default(cuid())
+  name             String
+  email            String?
+  phone            String?
+  telegramUsername String?
+  twitterHandle    String?
+  companyName      String?
+  status           String     @default("not_contacted") // drives which section contact appears in
+  tierId           String?
+  notes            String?
+  customFields     Json       @default("{}")
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  tier        Tier?        @relation(fields: [tierId], references: [id])
+  contactTags ContactTag[]
+  deals       Deal[]
+  activities  Activity[]
+}
+
+model ContactTag {
+  contactId String
+  tagId     String
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+}
+
+model PipelineStage {
+  id    String @id @default(cuid())
+  name  String @unique
+  order Int
+  color String @default("#6366f1")
+  deals Deal[]
+}
+
+model Deal {
+  id           String    @id @default(cuid())
+  contactId    String
+  stageId      String?
+  ownerId      String?
+  notes        String?
+  description  String?
+  latestStatus String?
+  callDate     DateTime?
+  meetLink     String?
+  customFields Json      @default("{}")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  contact    Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  stage      PipelineStage? @relation(fields: [stageId], references: [id])
+  owner      User?          @relation(fields: [ownerId], references: [id])
+  activities Activity[]
+}
+
+model CustomFieldDefinition {
+  id        String @id @default(cuid())
+  name      String
+  fieldType String // "text" | "number" | "date" | "url" | "select"
+  appliesTo String // "contact" | "deal"
+  options   Json   @default("[]") // for select type
+  order     Int    @default(0)
+
+  @@unique([name, appliesTo])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  type      String   // "note" | "call" | "email" | "telegram" | "twitter" | "meeting"
+  body      String?
+  contactId String?
+  dealId    String?
+  userId    String?
+  createdAt DateTime @default(now())
+
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id])
+}

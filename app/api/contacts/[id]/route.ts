@@ -1,0 +1,39 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json();
+
+  const contact = await prisma.contact.update({
+    where: { id: params.id },
+    data: {
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.email !== undefined && { email: body.email || null }),
+      ...(body.phone !== undefined && { phone: body.phone || null }),
+      ...(body.telegramUsername !== undefined && { telegramUsername: body.telegramUsername || null }),
+      ...(body.twitterHandle !== undefined && { twitterHandle: body.twitterHandle || null }),
+      ...(body.companyName !== undefined && { companyName: body.companyName || null }),
+      ...(body.status !== undefined && { status: body.status }),
+      ...(body.notes !== undefined && { notes: body.notes || null }),
+      ...(body.tierId !== undefined && (
+        body.tierId
+          ? { tier: { connect: { id: body.tierId } } }
+          : { tier: { disconnect: true } }
+      )),
+      ...(body.tagIds !== undefined && {
+        contactTags: {
+          deleteMany: {},
+          create: body.tagIds.map((id: string) => ({ tagId: id })),
+        },
+      }),
+    },
+    include: { tier: true, contactTags: { include: { tag: true } } },
+  });
+
+  return NextResponse.json(contact);
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  await prisma.contact.delete({ where: { id: params.id } });
+  return new NextResponse(null, { status: 204 });
+}
