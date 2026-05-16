@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const contact = await prisma.contact.findUniqueOrThrow({
+    where: { id: params.id },
+    include: {
+      tier: true,
+      contactTags: { include: { tag: true } },
+      deals: {
+        include: {
+          stage: true,
+          activities: { orderBy: { createdAt: "desc" } },
+          tasks: { orderBy: { createdAt: "asc" } },
+        },
+        orderBy: { updatedAt: "desc" },
+      },
+    },
+  });
+  return NextResponse.json(contact);
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
 
@@ -13,6 +32,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.telegramUsername !== undefined && { telegramUsername: body.telegramUsername || null }),
       ...(body.twitterHandle !== undefined && { twitterHandle: body.twitterHandle || null }),
       ...(body.companyName !== undefined && { companyName: body.companyName || null }),
+      ...(body.pocUsername !== undefined && { pocUsername: body.pocUsername || null }),
+      ...(body.groupLink !== undefined && { groupLink: body.groupLink || null }),
+      ...(body.logoUrl !== undefined && { logoUrl: body.logoUrl || null }),
       ...(body.status !== undefined && { status: body.status }),
       ...(body.notes !== undefined && { notes: body.notes || null }),
       ...(body.tierId !== undefined && (

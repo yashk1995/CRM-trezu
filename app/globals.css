@@ -2,44 +2,207 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --primary: 238 84% 63%;
-    --primary-foreground: 0 0% 98%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --ring: 238 84% 63%;
-    --radius: 0.5rem;
-    --sidebar-bg: 240 5.9% 10%;
-    --sidebar-fg: 240 5% 64.9%;
-    --sidebar-fg-active: 0 0% 98%;
-    --sidebar-accent: 238 84% 63%;
-  }
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --brand:        #0953FF;
+  --brand-deep:   #003DCA;
+  --brand-bright: #1B66FF;
+  --brand-glow:   #4D86FF;
+  --brand-wash:   #EAF0FF;
+  --brand-wash-2: #DCE6FF;
+
+  /* Neutrals — cool-tinted */
+  --ink:      #0A0B10;
+  --ink-2:    #14161D;
+  --graphite: #2A2D36;
+  --slate:    #4A4E5A;
+  --stone:    #6E7280;
+  --fog:      #A6AAB4;
+  --mist:     #DCDFE5;
+  --cloud-2:  #ECEEF2;
+  --cloud:    #F4F5F7;
+  --paper:    #FFFFFF;
+
+  /* Semantic */
+  --emerald:      #00A66E;
+  --emerald-wash: #DAF5E9;
+  --amber:        #B07A00;
+  --amber-wash:   #FBEFCF;
+  --rose:         #D63A4B;
+  --rose-wash:    #FBE3E6;
+  --violet:       #6D52F5;
+  --violet-wash:  #ECE6FE;
+
+  /* Radii */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   8px;
+  --r-lg:   12px;
+  --r-xl:   16px;
+  --r-pill: 999px;
 }
 
 @layer base {
+  html, body { height: 100%; }
+
   body {
-    @apply bg-zinc-50 text-zinc-900 antialiased;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--cloud);
+    color: var(--ink);
+    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-feature-settings: "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
   }
+}
+
+/* ── Chip / badge ────────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: var(--r-xs);
+  background: var(--cloud);
+  color: var(--slate);
+  border: 1px solid var(--mist);
+  white-space: nowrap;
+}
+.chip.brand   { background: var(--brand-wash);   color: var(--brand-deep); border-color: transparent; }
+.chip.ink     { background: var(--ink);           color: white;             border-color: transparent; }
+.chip.emerald { background: var(--emerald-wash);  color: #006A47;           border-color: transparent; }
+.chip.rose    { background: var(--rose-wash);     color: #962633;           border-color: transparent; }
+.chip.amber   { background: var(--amber-wash);    color: #6E4D00;           border-color: transparent; }
+.chip.violet  { background: var(--violet-wash);   color: #3D2DB0;           border-color: transparent; }
+.chip.dot::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.85;
+}
+.chip-lg { height: 24px; font-size: 12px; padding: 0 10px; }
+
+/* ── Nav item ────────────────────────────────────────────────────────────── */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
+  margin: 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #A6AAB4;
+  position: relative;
+  cursor: pointer;
+}
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+}
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 6px; bottom: 6px;
+  width: 2px;
+  background: var(--brand);
+  border-radius: 2px;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+.t-head th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fog);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cloud-2);
+  background: var(--cloud);
+  white-space: nowrap;
+}
+.t-row td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--cloud-2);
+  vertical-align: middle;
+  color: var(--graphite);
+}
+.t-row:last-child td { border-bottom: 0; }
+.t-row:hover td { background: #FAFAFB; }
+.t-row.sel td { background: #F5F8FF; }
+
+/* ── Panel header ────────────────────────────────────────────────────────── */
+.panel-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--cloud-2);
+}
+.panel-h h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+/* ── Utility ─────────────────────────────────────────────────────────────── */
+.font-mono  { font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace; }
+.font-display { font-family: var(--font-display), var(--font-sans), sans-serif; }
+.ellipsis   { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes fadeOverlay {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes checkPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.animate-fade-up   { animation: fadeUp   0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in   { animation: fadeIn   0.18s ease both; }
+.animate-scale-in  { animation: scaleIn  0.2s  cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-down{ animation: slideDown 0.18s ease both; }
+
+.deal-card-hover:hover {
+  border-color: var(--brand) !important;
+  box-shadow: 0 0 0 3px var(--brand-wash) !important;
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: theme('colors.zinc.700') transparent;
+    scrollbar-color: var(--mist) transparent;
   }
 }

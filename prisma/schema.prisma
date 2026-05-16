@@ -43,16 +43,42 @@ model Contact {
   twitterHandle    String?
   companyName      String?
   status           String     @default("not_contacted") // drives which section contact appears in
+  pocUsername      String?
+  groupLink        String?
+  logoUrl          String?
   tierId           String?
   notes            String?
   customFields     Json       @default("{}")
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  tier        Tier?        @relation(fields: [tierId], references: [id])
-  contactTags ContactTag[]
-  deals       Deal[]
-  activities  Activity[]
+  tier         Tier?         @relation(fields: [tierId], references: [id])
+  contactTags  ContactTag[]
+  deals        Deal[]
+  activities   Activity[]
+  listContacts ListContact[]
+}
+
+model List {
+  id        String        @id @default(cuid())
+  name      String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  contacts  ListContact[]
+
+  @@map("lists")
+}
+
+model ListContact {
+  listId    String
+  contactId String
+  addedAt   DateTime @default(now())
+
+  list    List    @relation(fields: [listId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([listId, contactId])
+  @@map("list_contacts")
 }
 
 model ContactTag {
@@ -91,6 +117,21 @@ model Deal {
   stage      PipelineStage? @relation(fields: [stageId], references: [id])
   owner      User?          @relation(fields: [ownerId], references: [id])
   activities Activity[]
+  tasks      Task[]
+}
+
+model Task {
+  id        String    @id @default(cuid())
+  title     String
+  completed Boolean   @default(false)
+  dueAt     DateTime?
+  dealId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
 }
 
 model CustomFieldDefinition {
@@ -105,13 +146,14 @@ model CustomFieldDefinition {
 }
 
 model Activity {
-  id        String   @id @default(cuid())
-  type      String   // "note" | "call" | "email" | "telegram" | "twitter" | "meeting"
-  body      String?
-  contactId String?
-  dealId    String?
-  userId    String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  type        String   // "note" | "call" | "email" | "telegram" | "twitter" | "meeting"
+  body        String?
+  attachments Json     @default("[]")
+  contactId   String?
+  dealId      String?
+  userId      String?
+  createdAt   DateTime @default(now())
 
   contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
   deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
