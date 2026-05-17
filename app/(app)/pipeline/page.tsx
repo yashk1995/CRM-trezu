@@ -247,6 +247,7 @@ function PipelinePage() {
 
   const [detailDealId, setDetailDealId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [detailPreview, setDetailPreview] = useState<Deal | null>(null);
   const [lightboxAtt, setLightboxAtt] = useState<Attachment | null>(null);
 
   const sensors = useSensors(
@@ -299,6 +300,7 @@ function PipelinePage() {
 
   const openDetail = (id: string) => {
     setDetailDealId(id);
+    setDetailPreview(deals.find((d) => d.id === id) ?? null);
     setDetailOpen(true);
   };
 
@@ -461,7 +463,8 @@ function PipelinePage() {
       <DealDetailPanel
         dealId={detailDealId}
         open={detailOpen}
-        onClose={() => setDetailOpen(false)}
+        previewDeal={detailPreview ?? undefined}
+        onClose={() => { setDetailOpen(false); setDetailPreview(null); }}
         onUpdated={refreshDeals}
         onRemoved={refreshDeals}
         onOpenLightbox={(att) => { setLightboxAtt(att); setDetailOpen(false); }}

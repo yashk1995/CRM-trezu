@@ -6,6 +6,7 @@ import ContactAvatar from "@/components/ui/ContactAvatar";
 import { Send, Phone, FileText, Activity, Trash2, Pencil, Check, X, Circle, CheckCircle2, Calendar, Link2, ChevronLeft, MoreHorizontal, ExternalLink, User, Paperclip, File } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { cacheGet, cacheSet, cacheInvalidate } from "@/lib/cache";
 
 interface Tag  { id: string; name: string; color: string }
 interface Tier { id: string; label: string }
@@ -50,8 +51,24 @@ const inp = {
 
 const inputCls = `${inp.base} ${inp.focus}`;
 
+// Subset of Deal already in the pipeline board's state — used for instant header render
+interface PreviewDeal {
+  id: string;
+  notes: string | null; description: string | null;
+  latestStatus: string | null; callDate: string | null; meetLink: string | null;
+  stage: Stage | null;
+  owner: { id: string; name: string } | null;
+  contact: {
+    id: string; name: string; companyName: string | null;
+    pocUsername: string | null; logoUrl: string | null;
+    email: string | null; telegramUsername: string | null; twitterHandle: string | null;
+    tier: Tier | null; contactTags: { tag: Tag }[];
+  };
+}
+
 interface Props {
   dealId: string | null; open: boolean;
+  previewDeal?: PreviewDeal;
   onClose: () => void; onUpdated: () => void; onRemoved?: () => void;
   onOpenLightbox?: (att: Attachment) => void;
 }
@@ -59,9 +76,10 @@ interface Props {
 type Tab  = "updates" | "tasks" | "details";
 type View = "deal" | "contact";
 
-export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRemoved, onOpenLightbox }: Props) {
+export default function DealDetailPanel({ dealId, open, previewDeal, onClose, onUpdated, onRemoved, onOpenLightbox }: Props) {
   const [deal, setDeal] = useState<Deal | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fetchingActivities, setFetchingActivities] = useState(false);
   const [tab,  setTab]  = useState<Tab>("updates");
   const [view, setView] = useState<View>("deal");
   const [removing, setRemoving] = useState(false);
@@ -112,8 +130,9 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
 
   useEffect(() => {
     if (!dealId || !open) return;
-    setLoading(true); setTab("updates"); setView("deal"); setDeal(null);
-    fetch(`/api/deals/${dealId}`, { cache: "no-store" }).then((r) => r.json()).then((d: Deal & { customFields?: Record<string, string> }) => {
+    setTab("updates"); setView("deal");
+
+    const applyDeal = (d: Deal & { customFields?: Record<string, string> }) => {
       setDeal({ ...d, tasks: d.tasks ?? [] });
       setCompanyDraft(d.contact.companyName ?? "");
       setPocDraft(d.contact.name ?? "");
@@ -125,11 +144,36 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
         setCallTime(`${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`);
       } else { setCallDate(""); setCallTime(""); }
       setMeetLink(d.meetLink ?? "");
-      setOwnerId((d as typeof d & { owner?: { id: string } }).owner?.id ?? "");
+      setOwnerId(d.owner?.id ?? "");
       setCustomFieldValues((d.customFields as Record<string, string>) ?? {});
+    };
+
+    if (previewDeal) {
+      // Render header immediately from pipeline's in-memory data
+      applyDeal({ ...previewDeal, contact: { ...previewDeal.contact, phone: null, groupLink: null, status: "", deals: [] }, activities: [], tasks: [] });
+      setFetchingActivities(true);
       setLoading(false);
-    });
-  }, [dealId, open]);
+    } else {
+      const cached = cacheGet<Deal>(`deal-${dealId}`);
+      if (cached) {
+        applyDeal(cached as Deal & { customFields?: Record<string, string> });
+        setFetchingActivities(false);
+        setLoading(false);
+      } else {
+        setDeal(null);
+        setLoading(true);
+      }
+    }
+
+    fetch(`/api/deals/${dealId}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d: Deal & { customFields?: Record<string, string> }) => {
+        cacheSet(`deal-${dealId}`, d);
+        applyDeal(d);
+        setFetchingActivities(false);
+        setLoading(false);
+      });
+  }, [dealId, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [deal?.activities.length]);
 
@@ -139,6 +183,7 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ description, latestStatus, meetLink, callDate: callDate ? new Date(`${callDate}T${callTime || "00:00"}`).toISOString() : null, customFields: customFieldValues, ownerId: ownerId || null }),
     }).then((r) => r.json());
+    cacheInvalidate(`deal-${dealId}`, "pipeline-deals", "dashboard");
     setDeal((d) => d ? { ...d, ...updated } : d); setSaving(false); onUpdated();
   };
 
@@ -147,6 +192,7 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
     if (!confirm(`Remove ${deal.contact.companyName || deal.contact.name} from pipeline?`)) return;
     setRemoving(true);
     await fetch(`/api/deals/${dealId}`, { method: "DELETE" });
+    cacheInvalidate(`deal-${dealId}`, "pipeline-deals", "dashboard");
     onClose(); onUpdated(); onRemoved?.();
   };
 
@@ -492,7 +538,9 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
             {tab === "updates" && (
               <div className="flex flex-col">
                 {deal.activities.length === 0 && (
-                  <p style={{ padding: "24px 20px", fontSize: 13, color: "var(--stone)" }}>No updates yet.</p>
+                  <p style={{ padding: "24px 20px", fontSize: 13, color: "var(--stone)" }}>
+                    {fetchingActivities ? "Loading updates…" : "No updates yet."}
+                  </p>
                 )}
                 {deal.activities.map((a, idx) => {
                   const s = ACT_STYLE[a.type] ?? ACT_STYLE.note;
@@ -565,7 +613,9 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
             {tab === "tasks" && (
               <div>
                 {deal.tasks.length === 0 && (
-                  <p style={{ padding: "24px 20px", fontSize: 13, color: "var(--stone)" }}>No tasks yet.</p>
+                  <p style={{ padding: "24px 20px", fontSize: 13, color: "var(--stone)" }}>
+                    {fetchingActivities ? "Loading tasks…" : "No tasks yet."}
+                  </p>
                 )}
                 {deal.tasks.map((t) => (
                   <div key={t.id} className="group animate-fade-in flex items-center gap-3"
