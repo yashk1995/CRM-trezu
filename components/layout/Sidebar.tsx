@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard, Send, Kanban, SquareCheckBig, Settings,
-  List, Plus, Pencil, Trash2, Check, X, ChevronDown, LogOut,
+  List, Plus, Pencil, Trash2, Check, X, ChevronDown, LogOut, Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ const navItems = [
   { href: "/outreach",  label: "Outreach",  icon: Send },
   { href: "/pipeline",  label: "Pipeline",  icon: Kanban },
   { href: "/tasks",     label: "Tasks",     icon: SquareCheckBig },
+  { href: "/agent",     label: "AI Agent",  icon: Bot },
 ];
 
 interface CrmList { id: string; name: string; _count?: { contacts: number } }
