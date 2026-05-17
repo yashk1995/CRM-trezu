@@ -7,7 +7,15 @@ import { checkRateLimit } from "@/lib/rate-limit";
 const AGENT_MAX_QUERIES = 5;
 const AGENT_WINDOW_MS   = 3 * 60 * 60 * 1000; // 3 hours
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Lazy-initialized so a missing key doesn't crash the module at import time
+let _client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("ANTHROPIC_API_KEY is not set. Add it to your .env file.");
+  }
+  if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return _client;
+}
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -239,53 +247,61 @@ export async function POST(req: NextRequest) {
   const userMessage = (body.message ?? "").trim();
   if (!userMessage) return NextResponse.json({ error: "Message is required." }, { status: 400 });
 
-  const systemPrompt = `You are an AI assistant embedded in a CRM called trezu. Today is ${new Date().toDateString()}.
+  try {
+    const claude = getClient();
+
+    const systemPrompt = `You are an AI assistant embedded in a CRM called trezu. Today is ${new Date().toDateString()}.
 You have access to tools to query live CRM data: contacts, pipeline deals, tasks, and activity logs.
 Always use the tools to answer data questions — never guess numbers or names.
 Be concise and factual. Use bullet points for lists. Format numbers clearly.`;
 
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: userMessage }];
+    const messages: Anthropic.MessageParam[] = [{ role: "user", content: userMessage }];
 
-  let response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
-    system: systemPrompt,
-    tools,
-    messages,
-  });
-
-  // Agentic loop — up to 5 tool-call rounds
-  let rounds = 0;
-  while (response.stop_reason === "tool_use" && rounds < 5) {
-    rounds++;
-    const toolUseBlocks = response.content.filter(
-      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-    );
-    messages.push({ role: "assistant", content: response.content });
-
-    const results: Anthropic.ToolResultBlockParam[] = await Promise.all(
-      toolUseBlocks.map(async (block) => ({
-        type: "tool_result" as const,
-        tool_use_id: block.id,
-        content: JSON.stringify(
-          await runTool(block.name, block.input as Record<string, unknown>),
-        ),
-      })),
-    );
-    messages.push({ role: "user", content: results });
-
-    response = await client.messages.create({
+    let response = await claude.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
       system: systemPrompt,
       tools,
       messages,
     });
-  }
 
-  const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
-  return NextResponse.json({
-    reply: text?.text ?? "I could not generate a response.",
-    remaining,
-  });
+    // Agentic loop — up to 5 tool-call rounds
+    let rounds = 0;
+    while (response.stop_reason === "tool_use" && rounds < 5) {
+      rounds++;
+      const toolUseBlocks = response.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
+      );
+      messages.push({ role: "assistant", content: response.content });
+
+      const results: Anthropic.ToolResultBlockParam[] = await Promise.all(
+        toolUseBlocks.map(async (block) => ({
+          type: "tool_result" as const,
+          tool_use_id: block.id,
+          content: JSON.stringify(
+            await runTool(block.name, block.input as Record<string, unknown>),
+          ),
+        })),
+      );
+      messages.push({ role: "user", content: results });
+
+      response = await claude.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools,
+        messages,
+      });
+    }
+
+    const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
+    return NextResponse.json({
+      reply: text?.text ?? "I could not generate a response.",
+      remaining,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[AI Agent]", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

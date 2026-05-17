@@ -59,19 +59,28 @@ export default function AgentPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: msg }),
       });
+
+      // Guard against HTML error pages (e.g. 500 before JSON is returned)
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        setMessages((m) => [...m, { role: "assistant", content: `Server error (${res.status}). Check that ANTHROPIC_API_KEY is set in your .env file.` }]);
+        return;
+      }
+
       const data = await res.json();
 
       if (res.status === 429) {
         setMessages((m) => [...m, { role: "assistant", content: data.error ?? "Rate limit reached. You have 5 queries per 3-hour window." }]);
         setRemaining(0);
       } else if (!res.ok) {
-        setMessages((m) => [...m, { role: "assistant", content: "Something went wrong. Please try again." }]);
+        setMessages((m) => [...m, { role: "assistant", content: data.error ?? "Something went wrong. Please try again." }]);
       } else {
         setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
         setRemaining(data.remaining);
       }
-    } catch {
-      setMessages((m) => [...m, { role: "assistant", content: "Could not reach the server. Please try again." }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setMessages((m) => [...m, { role: "assistant", content: `Could not reach the server: ${msg}` }]);
     } finally {
       setLoading(false);
     }
