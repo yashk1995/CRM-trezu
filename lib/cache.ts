@@ -16,3 +16,9 @@ export function cacheSet<T>(key: string, data: T): void {
 export function cacheInvalidate(...keys: string[]): void {
   keys.forEach((k) => store.delete(k));
 }
+
+export function cacheClearPrefix(prefix: string): void {
+  Array.from(store.keys()).forEach((key) => {
+    if (key.startsWith(prefix)) store.delete(key);
+  });
+}

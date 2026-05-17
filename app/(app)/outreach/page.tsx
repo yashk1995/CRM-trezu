@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cacheGet, cacheSet, cacheClearPrefix } from "@/lib/cache";
 import Link from "next/link";
 import { Plus, Search, ArrowRight, Pencil, Trash2, ExternalLink, ChevronDown, Download, X } from "lucide-react";
 import ContactFormModal      from "@/components/outreach/ContactFormModal";
@@ -63,21 +64,35 @@ export default function OutreachPage() {
     }
   }, [bulkAction]);
 
-  const fetchContacts = useCallback(async () => {
+  const fetchContacts = useCallback(async (invalidate = false) => {
     const params = new URLSearchParams();
     if (search)       params.set("search",  search);
     if (filterStatus) params.set("status",  filterStatus);
     if (filterTier)   params.set("tierId",  filterTier);
     if (filterTag)    params.set("tagId",   filterTag);
-    const res = await fetch(`/api/contacts?${params}`);
-    setContacts(await res.json());
+    const cacheKey = `contacts:${params.toString()}`;
+
+    if (invalidate) {
+      cacheClearPrefix("contacts:");
+    } else {
+      const cached = cacheGet<Contact[]>(cacheKey);
+      if (cached) { setContacts(cached); setLoading(false); }
+    }
+
+    const data = await fetch(`/api/contacts?${params}`).then((r) => r.json());
+    cacheSet(cacheKey, data);
+    setContacts(data);
     setLoading(false);
   }, [search, filterStatus, filterTier, filterTag]);
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
   useEffect(() => {
-    fetch("/api/tiers").then((r) => r.json()).then(setTiers);
-    fetch("/api/tags").then((r)  => r.json()).then(setTags);
+    const cachedTiers = cacheGet<Tier[]>("tiers", 300_000);
+    const cachedTags  = cacheGet<Tag[]>("tags",   300_000);
+    if (cachedTiers) setTiers(cachedTiers);
+    if (cachedTags)  setTags(cachedTags);
+    if (!cachedTiers) fetch("/api/tiers").then((r) => r.json()).then((d) => { cacheSet("tiers", d); setTiers(d); });
+    if (!cachedTags)  fetch("/api/tags").then((r)  => r.json()).then((d) => { cacheSet("tags",  d); setTags(d); });
   }, []);
 
   const applyView = (idx: number) => {
@@ -88,7 +103,7 @@ export default function OutreachPage() {
   const deleteContact = async (id: string) => {
     if (!confirm("Delete this contact?")) return;
     await fetch(`/api/contacts/${id}`, { method: "DELETE" });
-    fetchContacts();
+    fetchContacts(true);
   };
 
   const openMoveToPipeline = (c: Contact) => {
@@ -100,7 +115,7 @@ export default function OutreachPage() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    fetchContacts();
+    fetchContacts(true);
   };
 
   const openEdit = (c: Contact) => {
@@ -143,7 +158,7 @@ export default function OutreachPage() {
     ));
     setBulkAction(null);
     setSelectedIds(new Set());
-    fetchContacts();
+    fetchContacts(true);
   };
 
   // CSV export
@@ -437,7 +452,7 @@ export default function OutreachPage() {
       <ContactFormModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSaved={fetchContacts}
+        onSaved={() => fetchContacts(true)}
         initial={editing ?? undefined}
       />
 
@@ -445,7 +460,7 @@ export default function OutreachPage() {
         open={!!pipelineContact}
         onClose={() => setPipelineContact(null)}
         contact={pipelineContact}
-        onMoved={() => { fetchContacts(); setPipelineContact(null); }}
+        onMoved={() => { fetchContacts(true); setPipelineContact(null); }}
       />
     </div>
   );
