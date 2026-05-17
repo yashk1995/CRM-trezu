@@ -41,7 +41,7 @@ export default function SetupPage() {
         setError(data.error ?? "Something went wrong");
       }
     } catch {
-      setError("Network error — make sure the server is running");
+      setError("Request failed — check your connection and try again");
     } finally {
       setLoading(false);
     }
