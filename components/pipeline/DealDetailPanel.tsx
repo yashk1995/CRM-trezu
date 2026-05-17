@@ -19,6 +19,7 @@ interface Deal {
   id: string; notes: string | null; description: string | null;
   latestStatus: string | null; callDate: string | null; meetLink: string | null;
   stage: Stage | null;
+  owner: { id: string; name: string } | null;
   contact: {
     id: string; name: string; companyName: string | null;
     pocUsername: string | null; groupLink: string | null; logoUrl: string | null;
@@ -90,6 +91,10 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
   const [newTask,    setNewTask]    = useState("");
   const [newTaskDue, setNewTaskDue] = useState("");
 
+  // Owner
+  const [ownerId,  setOwnerId]  = useState<string>("");
+  const [members,  setMembers]  = useState<{ id: string; name: string }[]>([]);
+
   // Custom fields
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
@@ -99,9 +104,10 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch("/api/custom-field-definitions?appliesTo=deal")
-      .then((r) => r.json())
-      .then(setCustomFieldDefs);
+    fetch("/api/custom-field-definitions?appliesTo=deal").then((r) => r.json()).then(setCustomFieldDefs);
+    fetch("/api/users").then((r) => r.ok ? r.json() : []).then((users) =>
+      setMembers(users.map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })))
+    );
   }, []);
 
   useEffect(() => {
@@ -119,6 +125,7 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
         setCallTime(`${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`);
       } else { setCallDate(""); setCallTime(""); }
       setMeetLink(d.meetLink ?? "");
+      setOwnerId((d as typeof d & { owner?: { id: string } }).owner?.id ?? "");
       setCustomFieldValues((d.customFields as Record<string, string>) ?? {});
       setLoading(false);
     });
@@ -130,7 +137,7 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
     if (!dealId) return; setSaving(true);
     const updated = await fetch(`/api/deals/${dealId}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description, latestStatus, meetLink, callDate: callDate ? new Date(`${callDate}T${callTime || "00:00"}`).toISOString() : null, customFields: customFieldValues }),
+      body: JSON.stringify({ description, latestStatus, meetLink, callDate: callDate ? new Date(`${callDate}T${callTime || "00:00"}`).toISOString() : null, customFields: customFieldValues, ownerId: ownerId || null }),
     }).then((r) => r.json());
     setDeal((d) => d ? { ...d, ...updated } : d); setSaving(false); onUpdated();
   };
@@ -603,6 +610,19 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
             {/* DETAILS tab */}
             {tab === "details" && (
               <div style={{ padding: "20px" }} className="space-y-4 animate-fade-up">
+
+                {/* Owner selector */}
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fog)", marginBottom: 8 }}>Deal owner</label>
+                  <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)}
+                    style={{ ...inp.style, border: "1px solid var(--mist)", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", width: "100%", cursor: "pointer" }}>
+                    <option value="">— unassigned —</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {[
                   { label: "Description", render: (
                     <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Context about this deal…"

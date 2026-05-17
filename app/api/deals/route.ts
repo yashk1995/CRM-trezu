@@ -10,6 +10,7 @@ export async function GET() {
     include: {
       contact: { include: { tier: true, contactTags: { include: { tag: true } } } },
       stage: true,
+      owner: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -25,14 +26,17 @@ export async function POST(req: NextRequest) {
   const deal = await prisma.deal.create({
     data: {
       contact: { connect: { id: body.contactId } },
-      notes: body.notes || null,
+      notes:    body.notes || null,
       callDate: body.callDate ? new Date(body.callDate) : null,
       meetLink: body.meetLink || null,
+      // default owner = whoever is logged in
+      owner: { connect: { id: body.ownerId ?? session.userId } },
       ...(body.stageId ? { stage: { connect: { id: body.stageId } } } : {}),
     },
     include: {
       contact: { include: { tier: true, contactTags: { include: { tag: true } } } },
       stage: true,
+      owner: { select: { id: true, name: true } },
     },
   });
 

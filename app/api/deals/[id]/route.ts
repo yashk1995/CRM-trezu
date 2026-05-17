@@ -20,6 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         },
       },
       stage: true,
+      owner: { select: { id: true, name: true } },
       activities: { orderBy: { createdAt: "asc" } },
       tasks: { orderBy: { createdAt: "asc" } },
     },
@@ -46,10 +47,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           ? { stage: { connect: { id: body.stageId } } }
           : { stage: { disconnect: true } }
       )),
+      ...(body.ownerId !== undefined && (
+        body.ownerId
+          ? { owner: { connect: { id: body.ownerId } } }
+          : { owner: { disconnect: true } }
+      )),
     },
     include: {
       contact: { include: { tier: true, contactTags: { include: { tag: true } } } },
       stage: true,
+      owner: { select: { id: true, name: true } },
       activities: { orderBy: { createdAt: "asc" } },
     },
   });

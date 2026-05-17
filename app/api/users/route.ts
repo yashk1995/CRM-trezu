@@ -18,9 +18,11 @@ function generateTempPassword(): string {
 
 export async function GET() {
   const session = await getSession();
-  if (!session || session.role !== "admin")
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+  if (!session)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // All authenticated users can read the members list (for owner assignment etc.)
+  // Only admins can create/delete members (enforced on POST/DELETE)
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, email: true, role: true, createdAt: true },

@@ -35,6 +35,7 @@ interface Deal {
   latestStatus: string | null; callDate: string | null;
   meetLink: string | null; stageId: string | null;
   contact: Contact; stage: Stage | null;
+  owner: { id: string; name: string } | null;
 }
 
 function DealCard({ deal, onDelete, onOpen, isActive, isSelected, onSelect }: {
@@ -104,6 +105,16 @@ function DealCard({ deal, onDelete, onOpen, isActive, isSelected, onSelect }: {
           <span key={tag.id} className="chip">{tag.name}</span>
         ))}
       </div>
+
+      {/* Owner chip */}
+      {deal.owner && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 5, height: 22, padding: "0 8px", borderRadius: 999, background: "var(--amber-wash)", border: "1px solid rgba(176,122,0,0.18)", width: "fit-content" }}>
+          <div style={{ width: 14, height: 14, borderRadius: 999, background: "var(--amber)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "white", flexShrink: 0 }}>
+            {deal.owner.name[0].toUpperCase()}
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#6E4D00" }}>{deal.owner.name}</span>
+        </div>
+      )}
 
       {deal.latestStatus && (
         <div style={{ background: "var(--brand-wash)", borderRadius: 6, padding: "6px 8px", fontSize: 12, fontWeight: 500, color: "var(--brand-deep)" }}>
