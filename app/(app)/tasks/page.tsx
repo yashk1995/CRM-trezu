@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { cacheGet, cacheSet } from "@/lib/cache";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Circle, CheckCircle2, Trash2, ChevronDown } from "lucide-react";
 
@@ -122,10 +123,16 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchTasks = async (completed: boolean) => {
-    setLoading(true);
+    const key = `tasks:${completed}`;
+    const cached = cacheGet<Task[]>(key);
+    if (cached) { setTasks(cached); setLoading(false); }
     const res = await fetch(`/api/tasks?completed=${completed}`);
-    if (res.ok) setTasks(await res.json());
-    setLoading(false);
+    if (res.ok) {
+      const data = await res.json();
+      cacheSet(key, data);
+      setTasks(data);
+    }
+    if (!cached) setLoading(false);
   };
 
   useEffect(() => { fetchTasks(tab === "completed"); }, [tab]);

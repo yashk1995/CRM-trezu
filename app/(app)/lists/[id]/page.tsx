@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { cacheGet, cacheSet, cacheInvalidate } from "@/lib/cache";
 import { useParams, useRouter } from "next/navigation";
 import { Trash2, Plus, Columns, Check, ChevronDown, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -257,24 +258,38 @@ export default function ListDetailPage() {
   // Fetch list info + list contacts in parallel
   const loadPage = async () => {
     if (!id) return;
-    setLoading(true);
+    const cachedList     = cacheGet<CrmList>(`list:${id}`);
+    const cachedContacts = cacheGet<ListContact[]>(`list-contacts:${id}`);
+    if (cachedList)     { setList(cachedList); setNameValue(cachedList.name); }
+    if (cachedContacts) { setListContacts(cachedContacts); }
+    if (cachedList && cachedContacts) setLoading(false);
+
     const [listRes, contactsRes] = await Promise.all([
       fetch(`/api/lists/${id}`),
       fetch(`/api/lists/${id}/contacts`),
     ]);
     if (listRes.ok) {
       const data = await listRes.json();
-      setList(data);
-      setNameValue(data.name);
+      cacheSet(`list:${id}`, data);
+      setList(data); setNameValue(data.name);
     }
-    if (contactsRes.ok) setListContacts(await contactsRes.json());
+    if (contactsRes.ok) {
+      const data = await contactsRes.json();
+      cacheSet(`list-contacts:${id}`, data);
+      setListContacts(data);
+    }
     setLoading(false);
   };
 
   const refreshContacts = async () => {
     if (!id) return;
+    cacheInvalidate(`list-contacts:${id}`);
     const res = await fetch(`/api/lists/${id}/contacts`);
-    if (res.ok) setListContacts(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      cacheSet(`list-contacts:${id}`, data);
+      setListContacts(data);
+    }
   };
 
   useEffect(() => { loadPage(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
