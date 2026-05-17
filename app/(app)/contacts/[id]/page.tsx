@@ -20,6 +20,7 @@ interface Contact {
   phone: string | null; telegramUsername: string | null; twitterHandle: string | null;
   status: string; tier: Tier | null; contactTags: { tag: Tag }[]; deals: Deal[];
   customFields: Record<string, string>;
+  pocs: { name: string; username?: string }[];
 }
 
 const ACT_STYLE: Record<string, { bg: string; color: string }> = {
@@ -128,7 +129,34 @@ export default function ContactDetailPage() {
 
         {/* Info grid — all fields, priority order */}
         <dl className="mt-5 grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3">
-          <InfoRow label="POC Username"  value={contact.pocUsername} />
+          {/* All POCs — primary + additional */}
+          <div className="col-span-2 sm:col-span-3">
+            <dt style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fog)", marginBottom: 8 }}>
+              Points of Contact
+            </dt>
+            <dd style={{ margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              {/* Primary POC */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--graphite)" }}>{contact.name}</span>
+                {contact.pocUsername && (
+                  <span style={{ fontSize: 12, color: "var(--stone)", fontFamily: "var(--font-mono)" }}>{contact.pocUsername}</span>
+                )}
+                <span style={{ fontSize: 10, color: "var(--fog)", background: "var(--cloud-2)", borderRadius: 4, padding: "1px 6px" }}>primary</span>
+              </div>
+              {/* Additional POCs */}
+              {contact.pocs.map((poc, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--graphite)" }}>{poc.name}</span>
+                  {poc.username && (
+                    <span style={{ fontSize: 12, color: "var(--stone)", fontFamily: "var(--font-mono)" }}>{poc.username}</span>
+                  )}
+                </div>
+              ))}
+              {!contact.pocUsername && contact.pocs.length === 0 && (
+                <span style={{ color: "var(--mist)", fontSize: 13 }}>—</span>
+              )}
+            </dd>
+          </div>
           <InfoRow label="Group Link"    value={contact.groupLink} link={!!contact.groupLink} />
           <InfoRow label="Telegram"      value={contact.telegramUsername} />
           <InfoRow label="Twitter / X"   value={contact.twitterHandle} />

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import ContactAvatar from "@/components/ui/ContactAvatar";
 import { cn } from "@/lib/utils";
-import { Camera, X } from "lucide-react";
+import { Camera, X, Plus } from "lucide-react";
 
 interface Tier { id: string; label: string }
 interface Tag { id: string; name: string; color: string }
@@ -25,12 +25,13 @@ interface ContactFormData {
   tagIds: string[];
   notes: string;
   customFields: Record<string, string>;
+  pocs: { name: string; username: string }[];
 }
 
 const EMPTY: ContactFormData = {
   name: "", companyName: "", pocUsername: "", groupLink: "", logoUrl: "",
   email: "", phone: "", telegramUsername: "", twitterHandle: "",
-  status: "not_contacted", tierId: "", tagIds: [], notes: "", customFields: {},
+  status: "not_contacted", tierId: "", tagIds: [], notes: "", customFields: {}, pocs: [],
 };
 
 type ContactFormInitial = { [K in keyof ContactFormData]?: ContactFormData[K] | null } & { id?: string };
@@ -78,6 +79,11 @@ export default function ContactFormModal({ open, onClose, onSaved, initial }: Pr
 
   const toggleTag = (id: string) =>
     set("tagIds", form.tagIds.includes(id) ? form.tagIds.filter((t) => t !== id) : [...form.tagIds, id]);
+
+  const addPoc    = () => setForm((f) => ({ ...f, pocs: [...f.pocs, { name: "", username: "" }] }));
+  const removePoc = (i: number) => setForm((f) => ({ ...f, pocs: f.pocs.filter((_, j) => j !== i) }));
+  const updatePoc = (i: number, field: "name" | "username", value: string) =>
+    setForm((f) => ({ ...f, pocs: f.pocs.map((p, j) => j === i ? { ...p, [field]: value } : p) }));
 
   const addTag = async () => {
     if (!newTag.trim()) return;
@@ -177,33 +183,65 @@ export default function ContactFormModal({ open, onClose, onSaved, initial }: Pr
 
         {/* ── Point of Contact ─────────────────────────────────────────────── */}
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Point of Contact</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2 sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-zinc-600">POC Name *</label>
-              <input required className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Contact person's name" />
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="mb-1 block text-xs font-medium text-zinc-600">POC Username</label>
-              <input className={inputCls} value={form.pocUsername} onChange={(e) => set("pocUsername", e.target.value)} placeholder="@username" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Email</label>
-              <input className={inputCls} type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@example.com" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Phone</label>
-              <input className={inputCls} value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+1 234 567 8900" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Telegram</label>
-              <input className={inputCls} value={form.telegramUsername} onChange={(e) => set("telegramUsername", e.target.value)} placeholder="@telegram" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Twitter / X</label>
-              <input className={inputCls} value={form.twitterHandle} onChange={(e) => set("twitterHandle", e.target.value)} placeholder="@handle" />
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Points of Contact</p>
+
+          {/* Primary POC */}
+          <div className="mb-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Primary</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Name *</label>
+                <input required className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Contact person's name" />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Username</label>
+                <input className={inputCls} value={form.pocUsername} onChange={(e) => set("pocUsername", e.target.value)} placeholder="@username" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Email</label>
+                <input className={inputCls} type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@example.com" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Phone</label>
+                <input className={inputCls} value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+1 234 567 8900" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Telegram</label>
+                <input className={inputCls} value={form.telegramUsername} onChange={(e) => set("telegramUsername", e.target.value)} placeholder="@telegram" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600">Twitter / X</label>
+                <input className={inputCls} value={form.twitterHandle} onChange={(e) => set("twitterHandle", e.target.value)} placeholder="@handle" />
+              </div>
             </div>
           </div>
+
+          {/* Additional POCs */}
+          {form.pocs.map((poc, i) => (
+            <div key={i} className="mb-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">POC {i + 2}</p>
+                <button type="button" onClick={() => removePoc(i)} className="text-zinc-400 hover:text-red-500 transition-colors">
+                  <X size={13} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">Name *</label>
+                  <input required className={inputCls} value={poc.name} onChange={(e) => updatePoc(i, "name", e.target.value)} placeholder="Contact person's name" />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">Username</label>
+                  <input className={inputCls} value={poc.username} onChange={(e) => updatePoc(i, "username", e.target.value)} placeholder="@username" />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <button type="button" onClick={addPoc}
+            className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
+            <Plus size={12} /> Add another POC
+          </button>
         </div>
 
         {/* ── Classification ───────────────────────────────────────────────── */}

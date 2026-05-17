@@ -43,6 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.status !== undefined && { status: body.status }),
       ...(body.notes !== undefined && { notes: body.notes || null }),
       ...(body.customFields !== undefined && { customFields: body.customFields }),
+      ...(body.pocs !== undefined && { pocs: body.pocs }),
       ...(body.tierId !== undefined && (
         body.tierId
           ? { tier: { connect: { id: body.tierId } } }

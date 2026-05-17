@@ -30,6 +30,7 @@ interface Contact {
   pocUsername: string | null; logoUrl: string | null;
   telegramUsername: string | null; twitterHandle: string | null;
   email: string | null; tier: Tier | null; contactTags: { tag: Tag }[];
+  pocs: { name: string; username?: string }[];
 }
 interface Deal {
   id: string; notes: string | null; description: string | null;

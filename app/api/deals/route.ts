@@ -13,7 +13,7 @@ export async function GET() {
       createdAt: true, updatedAt: true,
       contact: {
         select: {
-          id: true, name: true, companyName: true, pocUsername: true,
+          id: true, name: true, companyName: true, pocUsername: true, pocs: true,
           logoUrl: true, telegramUsername: true, twitterHandle: true, email: true,
           tier: { select: { id: true, label: true } },
           contactTags: { select: { tag: { select: { id: true, name: true, color: true } } } },
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       createdAt: true, updatedAt: true,
       contact: {
         select: {
-          id: true, name: true, companyName: true, pocUsername: true,
+          id: true, name: true, companyName: true, pocUsername: true, pocs: true,
           logoUrl: true, telegramUsername: true, twitterHandle: true, email: true,
           tier: { select: { id: true, label: true } },
           contactTags: { select: { tag: { select: { id: true, name: true, color: true } } } },

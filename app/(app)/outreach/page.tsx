@@ -11,6 +11,7 @@ import Badge            from "@/components/ui/Badge";
 
 interface Tag    { id: string; name: string; color: string }
 interface Tier   { id: string; label: string }
+interface POC { name: string; username?: string }
 interface Contact {
   id: string; name: string; companyName: string | null;
   pocUsername: string | null; groupLink: string | null; logoUrl: string | null;
@@ -19,6 +20,7 @@ interface Contact {
   status: string; tier: Tier | null;
   contactTags: { tag: Tag }[];
   _count: { deals: number };
+  pocs: POC[];
 }
 
 const VIEWS = [
@@ -46,7 +48,7 @@ export default function OutreachPage() {
   const [activeView,   setActiveView]   = useState(0);
   const [loading,      setLoading]      = useState(true);
   const [modalOpen,       setModalOpen]       = useState(false);
-  const [editing,         setEditing]         = useState<(Partial<Contact> & { id?: string; tagIds?: string[]; tierId?: string }) | null>(null);
+  const [editing,         setEditing]         = useState<(Partial<Contact> & { id?: string; tagIds?: string[]; tierId?: string; pocs?: { name: string; username: string }[] }) | null>(null);
   const [pipelineContact, setPipelineContact] = useState<Contact | null>(null);
 
   // Bulk selection
@@ -131,6 +133,7 @@ export default function OutreachPage() {
       logoUrl:         c.logoUrl         ?? "",
       tagIds:          c.contactTags.map((ct) => ct.tag.id),
       tierId:          c.tier?.id        ?? "",
+      pocs:            c.pocs.map((p) => ({ name: p.name, username: p.username ?? "" })),
     });
     setModalOpen(true);
   };

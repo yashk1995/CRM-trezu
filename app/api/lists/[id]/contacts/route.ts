@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           deals: {
             include: {
               stage: true,
-              owner: true,
+              owner: { select: { id: true, name: true } },
             },
             orderBy: { updatedAt: "desc" },
           },

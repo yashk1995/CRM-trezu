@@ -28,6 +28,7 @@ interface Deal {
     telegramUsername: string | null; twitterHandle: string | null;
     status: string; tier: Tier | null; contactTags: { tag: Tag }[];
     deals?: { id: string; stage: Stage | null }[];
+    pocs?: { name: string; username?: string }[];
   };
   activities: ActivityItem[];
   tasks: TaskItem[];
@@ -63,6 +64,7 @@ interface PreviewDeal {
     pocUsername: string | null; logoUrl: string | null;
     email: string | null; telegramUsername: string | null; twitterHandle: string | null;
     tier: Tier | null; contactTags: { tag: Tag }[];
+    pocs?: { name: string; username?: string }[];
   };
 }
 
@@ -348,6 +350,7 @@ export default function DealDetailPanel({ dealId, open, previewDeal, onClose, on
                 <dl className="space-y-4">
                   {[
                     { label: "POC Username",  value: deal.contact.pocUsername },
+                    ...(deal.contact.pocs ?? []).map((p, i) => ({ label: `POC ${i + 2}`, value: p.username ? `${p.name} · ${p.username}` : p.name })),
                     { label: "Group Link",    value: deal.contact.groupLink,    link: true },
                     { label: "Telegram",      value: deal.contact.telegramUsername },
                     { label: "Twitter / X",   value: deal.contact.twitterHandle },
@@ -451,6 +454,7 @@ export default function DealDetailPanel({ dealId, open, previewDeal, onClose, on
                 <div className="flex flex-wrap gap-3 mt-2.5">
                   {[
                     { v: deal.contact.pocUsername,      icon: "✈" },
+                    ...(deal.contact.pocs ?? []).map((p) => ({ v: p.username || p.name, icon: "✈" })),
                     { v: deal.contact.telegramUsername, icon: "TG" },
                     { v: deal.contact.twitterHandle,    icon: "𝕏" },
                     { v: deal.contact.email,            icon: "✉" },

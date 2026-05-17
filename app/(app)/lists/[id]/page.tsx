@@ -359,7 +359,12 @@ export default function ListDetailPage() {
         return c.contactTags.length > 0
           ? <div className="flex flex-wrap gap-1">{c.contactTags.map(({ tag }) => <Badge key={tag.id} label={tag.name} className="bg-zinc-100 text-zinc-600" />)}</div>
           : em;
-      case "dealOwner":    return <span className="text-zinc-600">Admin</span>;
+      case "dealOwner": {
+        const owner = c.deals[0]?.owner;
+        return owner
+          ? <span className="text-zinc-600">{owner.name}</span>
+          : <span className="text-zinc-400">Unassigned</span>;
+      }
       case "latestStatus": return c.deals[0]?.latestStatus ? <span className="text-zinc-600">{c.deals[0].latestStatus}</span> : em;
       case "callDate": {
         const cd = c.deals[0]?.callDate;

@@ -18,6 +18,7 @@ const contactSchema = z.object({
   notes:           z.string().max(10000).nullish(),
   customFields:    z.record(z.string(), z.string()).optional(),
   logoUrl:         z.string().nullish(),
+  pocs:            z.array(z.object({ name: z.string().trim().min(1), username: z.string().trim().optional() })).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest) {
       status: body.status ?? "not_contacted",
       notes: body.notes || null,
       customFields: (body.customFields ?? {}) as object,
+      pocs: (body.pocs ?? []) as object,
       ...(body.tierId ? { tier: { connect: { id: body.tierId } } } : {}),
       ...(body.tagIds?.length
         ? { contactTags: { create: body.tagIds.map((id: string) => ({ tagId: id })) } }
