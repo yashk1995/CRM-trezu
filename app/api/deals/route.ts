@@ -7,8 +7,18 @@ export async function GET() {
   if (!session) return UNAUTH();
 
   const deals = await prisma.deal.findMany({
-    include: {
-      contact: { include: { tier: true, contactTags: { include: { tag: true } } } },
+    select: {
+      id: true, notes: true, description: true, latestStatus: true,
+      callDate: true, meetLink: true, stageId: true, customFields: true,
+      createdAt: true, updatedAt: true,
+      contact: {
+        select: {
+          id: true, name: true, companyName: true, pocUsername: true,
+          logoUrl: true, telegramUsername: true, twitterHandle: true, email: true,
+          tier: { select: { id: true, label: true } },
+          contactTags: { select: { tag: { select: { id: true, name: true, color: true } } } },
+        },
+      },
       stage: true,
       owner: { select: { id: true, name: true } },
     },
@@ -29,12 +39,21 @@ export async function POST(req: NextRequest) {
       notes:    body.notes || null,
       callDate: body.callDate ? new Date(body.callDate) : null,
       meetLink: body.meetLink || null,
-      // default owner = whoever is logged in
       owner: { connect: { id: body.ownerId ?? session.userId } },
       ...(body.stageId ? { stage: { connect: { id: body.stageId } } } : {}),
     },
-    include: {
-      contact: { include: { tier: true, contactTags: { include: { tag: true } } } },
+    select: {
+      id: true, notes: true, description: true, latestStatus: true,
+      callDate: true, meetLink: true, stageId: true, customFields: true,
+      createdAt: true, updatedAt: true,
+      contact: {
+        select: {
+          id: true, name: true, companyName: true, pocUsername: true,
+          logoUrl: true, telegramUsername: true, twitterHandle: true, email: true,
+          tier: { select: { id: true, label: true } },
+          contactTags: { select: { tag: { select: { id: true, name: true, color: true } } } },
+        },
+      },
       stage: true,
       owner: { select: { id: true, name: true } },
     },

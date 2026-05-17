@@ -84,6 +84,10 @@ model Contact {
   deals        Deal[]
   activities   Activity[]
   listContacts ListContact[]
+
+  @@index([status])
+  @@index([tierId])
+  @@index([createdAt])
 }
 
 model List {
@@ -145,6 +149,10 @@ model Deal {
   owner      User?          @relation(fields: [ownerId], references: [id])
   activities Activity[]
   tasks      Task[]
+
+  @@index([contactId])
+  @@index([stageId])
+  @@index([ownerId])
 }
 
 model Task {
@@ -158,6 +166,8 @@ model Task {
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
+  @@index([dealId])
+  @@index([completed])
   @@map("tasks")
 }
 
@@ -185,4 +195,7 @@ model Activity {
   contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
   deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   user    User?    @relation(fields: [userId], references: [id])
+
+  @@index([dealId])
+  @@index([contactId])
 }

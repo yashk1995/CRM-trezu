@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Zap, ArrowUpRight } from "lucide-react";
 import ContactAvatar from "@/components/ui/ContactAvatar";
 import { format } from "date-fns";
+import { cacheGet, cacheSet } from "@/lib/cache";
 
 interface Stage    { id: string; name: string; color: string; order: number; dealCount: number }
 interface Activity {
@@ -81,7 +82,18 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/dashboard").then((r) => r.json()).then((d) => { setData(d); setLoading(false); });
+    const cached = cacheGet<DashData>("dashboard");
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+    }
+    fetch("/api/dashboard")
+      .then((r) => r.json())
+      .then((d) => {
+        cacheSet("dashboard", d);
+        setData(d);
+        if (!cached) setLoading(false);
+      });
   }, []);
 
   if (loading || !data) {

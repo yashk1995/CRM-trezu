@@ -70,8 +70,14 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/contacts/${id}`).then((r) => r.json()).then((d) => { setContact(d); setLoading(false); });
-    fetch("/api/custom-field-definitions?appliesTo=contact").then((r) => r.json()).then(setCustomFieldDefs);
+    Promise.all([
+      fetch(`/api/contacts/${id}`).then((r) => r.json()),
+      fetch("/api/custom-field-definitions?appliesTo=contact").then((r) => r.json()),
+    ]).then(([contact, defs]) => {
+      setContact(contact);
+      setCustomFieldDefs(defs);
+      setLoading(false);
+    });
   }, [id]);
 
   const toggleTask = async (dealId: string, taskId: string, completed: boolean) => {

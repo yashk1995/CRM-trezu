@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   DndContext,
@@ -19,6 +19,7 @@ import Badge from "@/components/ui/Badge";
 import ContactAvatar from "@/components/ui/ContactAvatar";
 import DealModal from "@/components/pipeline/DealModal";
 import DealDetailPanel from "@/components/pipeline/DealDetailPanel";
+import { cacheGet, cacheSet, cacheInvalidate } from "@/lib/cache";
 
 interface Attachment { name: string; type: string; size: number; data: string }
 interface Tag { id: string; name: string; color: string }
@@ -150,10 +151,11 @@ function DealCard({ deal, onDelete, onOpen, isActive, isSelected, onSelect }: {
   );
 }
 
-function KanbanColumn({ stage, deals, onDelete, onOpen, onAddDeal, activeDealId, selectedIds, onSelect }: {
+function KanbanColumn({ stage, deals, onDelete, onOpen, onAddDeal, activeDealId, selectedIds, onSelect, dealsLoading }: {
   stage: Stage; deals: Deal[]; onDelete: (id: string) => void;
   onOpen: (id: string) => void; onAddDeal: (stageId: string) => void;
   activeDealId: string | null; selectedIds: Set<string>; onSelect: (id: string) => void;
+  dealsLoading: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${stage.id}` });
 
@@ -203,7 +205,12 @@ function KanbanColumn({ stage, deals, onDelete, onOpen, onAddDeal, activeDealId,
             onSelect={onSelect}
           />
         ))}
-        {deals.length === 0 && (
+        {dealsLoading && deals.length === 0 ? (
+          <>
+            <div className="animate-pulse" style={{ height: 72, borderRadius: 8, background: "var(--cloud-2)" }} />
+            <div className="animate-pulse" style={{ height: 52, borderRadius: 8, background: "var(--cloud-2)" }} />
+          </>
+        ) : deals.length === 0 ? (
           <div style={{
             flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
             border: `1px dashed ${isOver ? "var(--brand)" : "var(--mist)"}`,
@@ -215,7 +222,7 @@ function KanbanColumn({ stage, deals, onDelete, onOpen, onAddDeal, activeDealId,
           }}>
             Drop here
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -228,8 +235,10 @@ function PipelinePage() {
   const [stages, setStages] = useState<Stage[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [allContacts, setAllContacts] = useState<{ id: string; name: string; companyName: string | null; logoUrl: string | null }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);       // gates on stages only
+  const [dealsLoading, setDealsLoading] = useState(true);
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
+  const contactsLoadedRef = useRef(false);
 
   const [addModalOpen,    setAddModalOpen]    = useState(false);
   const [defaultStageId,  setDefaultStageId]  = useState<string | undefined>();
@@ -244,28 +253,49 @@ function PipelinePage() {
     useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   );
 
-  const fetchAll = useCallback(async () => {
-    const [stagesRes, dealsRes, contactsRes] = await Promise.all([
-      fetch("/api/pipeline-stages").then((r) => r.json()),
-      fetch("/api/deals").then((r) => r.json()),
-      fetch("/api/contacts").then((r) => r.json()),
-    ]);
-    setStages(stagesRes);
-    setDeals(dealsRes);
-    setAllContacts(contactsRes.map((c: any) => ({ id: c.id, name: c.name, companyName: c.companyName ?? null, logoUrl: c.logoUrl ?? null })));
-    setLoading(false);
+  // Refetch only deals (used after mutations — stages never change on deal ops)
+  const refreshDeals = useCallback(async () => {
+    cacheInvalidate("pipeline-deals", "dashboard");
+    const data: Deal[] = await fetch("/api/deals").then((r) => r.json());
+    cacheSet("pipeline-deals", data);
+    setDeals(data);
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  // Initial load: stages gate the board render; deals load in background
+  useEffect(() => {
+    const cachedStages = cacheGet<Stage[]>("pipeline-stages", 300_000); // 5 min TTL
+    const cachedDeals  = cacheGet<Deal[]>("pipeline-deals");
+
+    if (cachedStages) { setStages(cachedStages); setLoading(false); }
+    if (cachedDeals)  { setDeals(cachedDeals);   setDealsLoading(false); }
+
+    // Always refresh stages (tiny payload, fast)
+    fetch("/api/pipeline-stages")
+      .then((r) => r.json())
+      .then((data: Stage[]) => {
+        cacheSet("pipeline-stages", data);
+        setStages(data);
+        setLoading(false);
+      });
+
+    // Load deals in parallel — they populate columns in the background
+    fetch("/api/deals")
+      .then((r) => r.json())
+      .then((data: Deal[]) => {
+        cacheSet("pipeline-deals", data);
+        setDeals(data);
+        setDealsLoading(false);
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-open deal panel from URL param (e.g. "View in Pipeline" from Tasks)
   useEffect(() => {
     const openDealId = searchParams.get("openDeal");
-    if (!openDealId || loading) return;
+    if (!openDealId || dealsLoading) return;
     setDetailDealId(openDealId);
     setDetailOpen(true);
     router.replace("/pipeline", { scroll: false });
-  }, [loading, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dealsLoading, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openDetail = (id: string) => {
     setDetailDealId(id);
@@ -275,12 +305,25 @@ function PipelinePage() {
   const openAddDeal = (stageId: string) => {
     setDefaultStageId(stageId);
     setAddModalOpen(true);
+    // Lazy-load contacts — only needed for the modal, not for the board
+    if (contactsLoadedRef.current) return;
+    contactsLoadedRef.current = true;
+    const cached = cacheGet<typeof allContacts>("contacts-slim", 120_000);
+    if (cached) { setAllContacts(cached); return; }
+    fetch("/api/contacts")
+      .then((r) => r.json())
+      .then((data: any[]) => {
+        const slim = data.map((c) => ({ id: c.id, name: c.name, companyName: c.companyName ?? null, logoUrl: c.logoUrl ?? null }));
+        cacheSet("contacts-slim", slim);
+        setAllContacts(slim);
+      });
   };
 
   const deleteDeal = async (id: string) => {
     if (!confirm("Delete this deal?")) return;
+    setDeals((prev) => prev.filter((d) => d.id !== id));
     await fetch(`/api/deals/${id}`, { method: "DELETE" });
-    fetchAll();
+    refreshDeals();
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -388,6 +431,7 @@ function PipelinePage() {
               activeDealId={activeDeal?.id ?? null}
               selectedIds={selectedDealIds}
               onSelect={toggleSelectDeal}
+              dealsLoading={dealsLoading}
             />
           ))}
         </div>
@@ -407,7 +451,7 @@ function PipelinePage() {
       <DealModal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
-        onSaved={fetchAll}
+        onSaved={refreshDeals}
         deal={null}
         stages={stages}
         defaultStageId={defaultStageId}
@@ -418,8 +462,8 @@ function PipelinePage() {
         dealId={detailDealId}
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
-        onUpdated={fetchAll}
-        onRemoved={fetchAll}
+        onUpdated={refreshDeals}
+        onRemoved={refreshDeals}
         onOpenLightbox={(att) => { setLightboxAtt(att); setDetailOpen(false); }}
       />
 

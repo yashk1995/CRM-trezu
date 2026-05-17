@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Circle, CheckCircle2, Trash2, ChevronDown } from "lucide-react";
 
@@ -144,10 +144,12 @@ export default function TasksPage() {
   };
 
   // Group tasks
-  const overdue   = tasks.filter((t) => t.dueAt && isOverdue(t.dueAt));
-  const dueToday  = tasks.filter((t) => t.dueAt && isToday(t.dueAt));
-  const thisWeek  = tasks.filter((t) => t.dueAt && !isOverdue(t.dueAt) && !isToday(t.dueAt) && isThisWeek(t.dueAt));
-  const later     = tasks.filter((t) => !t.dueAt || (!isOverdue(t.dueAt) && !isToday(t.dueAt) && !isThisWeek(t.dueAt)));
+  const { overdue, dueToday, thisWeek, later } = useMemo(() => ({
+    overdue:  tasks.filter((t) => t.dueAt && isOverdue(t.dueAt)),
+    dueToday: tasks.filter((t) => t.dueAt && isToday(t.dueAt)),
+    thisWeek: tasks.filter((t) => t.dueAt && !isOverdue(t.dueAt) && !isToday(t.dueAt) && isThisWeek(t.dueAt)),
+    later:    tasks.filter((t) => !t.dueAt || (!isOverdue(t.dueAt) && !isToday(t.dueAt) && !isThisWeek(t.dueAt))),
+  }), [tasks]);
 
   const groups = tab === "completed"
     ? [{ title: "Completed", tone: "default" as const, tasks }]
