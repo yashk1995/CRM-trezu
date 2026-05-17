@@ -101,14 +101,10 @@ function TaskGroup({ title, tone = "default", tasks, onToggle, onDelete, onOpen 
             )}
 
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={() => onOpen(task.deal.id)}
-                style={{ height: 26, padding: "0 10px", fontSize: 11, fontWeight: 500, color: "var(--graphite)", background: "var(--paper)", border: "1px solid var(--mist)", borderRadius: 999, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
-                className="hover:border-brand hover:text-brand transition-colors">
+              <button onClick={() => onOpen(task.deal.id)} className="btn secondary xs">
                 Open deal <ArrowUpRight size={11} />
               </button>
-              <button onClick={() => onDelete(task.id)}
-                style={{ width: 26, height: 26, borderRadius: 6, background: "transparent", border: 0, cursor: "pointer", color: "var(--fog)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                className="hover:bg-rose-50 hover:text-rose transition-colors">
+              <button onClick={() => onDelete(task.id)} className="btn ghost icon xs" style={{ color: "var(--rose)" }}>
                 <Trash2 size={13} />
               </button>
             </div>

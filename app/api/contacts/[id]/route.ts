@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, UNAUTH } from "@/lib/api-auth";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireAuth();
+  if (!session) return UNAUTH();
   const contact = await prisma.contact.findUniqueOrThrow({
     where: { id: params.id },
     include: {
@@ -21,6 +24,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireAuth();
+  if (!session) return UNAUTH();
   const body = await req.json();
 
   const contact = await prisma.contact.update({
@@ -37,6 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(body.logoUrl !== undefined && { logoUrl: body.logoUrl || null }),
       ...(body.status !== undefined && { status: body.status }),
       ...(body.notes !== undefined && { notes: body.notes || null }),
+      ...(body.customFields !== undefined && { customFields: body.customFields }),
       ...(body.tierId !== undefined && (
         body.tierId
           ? { tier: { connect: { id: body.tierId } } }
@@ -56,6 +62,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireAuth();
+  if (!session) return UNAUTH();
   await prisma.contact.delete({ where: { id: params.id } });
   return new NextResponse(null, { status: 204 });
 }

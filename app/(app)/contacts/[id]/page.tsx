@@ -13,11 +13,13 @@ interface Stage   { id: string; name: string; color: string }
 interface Activity{ id: string; type: string; body: string | null; createdAt: string }
 interface Task    { id: string; title: string; completed: boolean }
 interface Deal    { id: string; description: string | null; latestStatus: string | null; callDate: string | null; meetLink: string | null; notes: string | null; stage: Stage | null; activities: Activity[]; tasks: Task[] }
+interface CustomFieldDef { id: string; name: string; fieldType: string; options: string[] }
 interface Contact {
   id: string; name: string; companyName: string | null; pocUsername: string | null;
   groupLink: string | null; logoUrl: string | null; email: string | null;
   phone: string | null; telegramUsername: string | null; twitterHandle: string | null;
   status: string; tier: Tier | null; contactTags: { tag: Tag }[]; deals: Deal[];
+  customFields: Record<string, string>;
 }
 
 const ACT_STYLE: Record<string, { bg: string; color: string }> = {
@@ -64,10 +66,12 @@ export default function ContactDetailPage() {
   const { id }  = useParams<{ id: string }>();
   const router  = useRouter();
   const [contact, setContact] = useState<Contact | null>(null);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch(`/api/contacts/${id}`).then((r) => r.json()).then((d) => { setContact(d); setLoading(false); });
+    fetch("/api/custom-field-definitions?appliesTo=contact").then((r) => r.json()).then(setCustomFieldDefs);
   }, [id]);
 
   const toggleTask = async (dealId: string, taskId: string, completed: boolean) => {
@@ -133,6 +137,15 @@ export default function ContactDetailPage() {
                 : <span style={{ color: "var(--mist)", fontSize: 13 }}>—</span>}
             </dd>
           </div>
+          {/* Custom fields */}
+          {customFieldDefs.filter((d) => contact.customFields?.[d.id]).map((def) => (
+            <InfoRow
+              key={def.id}
+              label={def.name}
+              value={contact.customFields[def.id] ?? null}
+              link={def.fieldType === "url"}
+            />
+          ))}
         </dl>
       </div>
 

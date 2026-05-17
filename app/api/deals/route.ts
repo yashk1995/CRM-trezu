@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, UNAUTH } from "@/lib/api-auth";
 
 export async function GET() {
+  const session = await requireAuth();
+  if (!session) return UNAUTH();
+
   const deals = await prisma.deal.findMany({
     include: {
       contact: { include: { tier: true, contactTags: { include: { tag: true } } } },
@@ -13,6 +17,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await requireAuth();
+  if (!session) return UNAUTH();
+
   const body = await req.json();
 
   const deal = await prisma.deal.create({

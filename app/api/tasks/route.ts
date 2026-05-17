@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, UNAUTH } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {
+  const session = await requireAuth();
+  if (!session) return UNAUTH();
+
   const completed = req.nextUrl.searchParams.get("completed") === "true";
   const tasks = await prisma.task.findMany({
     where: { completed },
@@ -19,6 +23,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await requireAuth();
+  if (!session) return UNAUTH();
+
   const { title, dealId, dueAt } = await req.json();
   const task = await prisma.task.create({
     data: { title, dealId, dueAt: dueAt ? new Date(dueAt) : null },

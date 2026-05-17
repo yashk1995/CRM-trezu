@@ -10,6 +10,7 @@ import { format } from "date-fns";
 interface Tag  { id: string; name: string; color: string }
 interface Tier { id: string; label: string }
 interface Stage{ id: string; name: string; color: string }
+interface CustomFieldDef { id: string; name: string; fieldType: string; options: string[] }
 interface Attachment   { name: string; type: string; size: number; data: string }
 interface ActivityItem { id: string; type: string; body: string | null; createdAt: string; attachments?: Attachment[] }
 interface TaskItem     { id: string; title: string; completed: boolean; dueAt?: string | null }
@@ -51,12 +52,13 @@ const inputCls = `${inp.base} ${inp.focus}`;
 interface Props {
   dealId: string | null; open: boolean;
   onClose: () => void; onUpdated: () => void; onRemoved?: () => void;
+  onOpenLightbox?: (att: Attachment) => void;
 }
 
 type Tab  = "updates" | "tasks" | "details";
 type View = "deal" | "contact";
 
-export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRemoved }: Props) {
+export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRemoved, onOpenLightbox }: Props) {
   const [deal, setDeal] = useState<Deal | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab,  setTab]  = useState<Tab>("updates");
@@ -88,17 +90,24 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
   const [newTask,    setNewTask]    = useState("");
   const [newTaskDue, setNewTaskDue] = useState("");
 
+  // Custom fields
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+
   // Attachments (composer)
   const [pendingFiles, setPendingFiles] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Lightbox
-  const [lightbox, setLightbox] = useState<Attachment | null>(null);
+  useEffect(() => {
+    fetch("/api/custom-field-definitions?appliesTo=deal")
+      .then((r) => r.json())
+      .then(setCustomFieldDefs);
+  }, []);
 
   useEffect(() => {
     if (!dealId || !open) return;
-    setLoading(true); setTab("updates"); setView("deal");
-    fetch(`/api/deals/${dealId}`).then((r) => r.json()).then((d: Deal) => {
+    setLoading(true); setTab("updates"); setView("deal"); setDeal(null);
+    fetch(`/api/deals/${dealId}`, { cache: "no-store" }).then((r) => r.json()).then((d: Deal & { customFields?: Record<string, string> }) => {
       setDeal({ ...d, tasks: d.tasks ?? [] });
       setCompanyDraft(d.contact.companyName ?? "");
       setPocDraft(d.contact.name ?? "");
@@ -110,6 +119,7 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
         setCallTime(`${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`);
       } else { setCallDate(""); setCallTime(""); }
       setMeetLink(d.meetLink ?? "");
+      setCustomFieldValues((d.customFields as Record<string, string>) ?? {});
       setLoading(false);
     });
   }, [dealId, open]);
@@ -120,7 +130,7 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
     if (!dealId) return; setSaving(true);
     const updated = await fetch(`/api/deals/${dealId}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description, latestStatus, meetLink, callDate: callDate ? new Date(`${callDate}T${callTime || "00:00"}`).toISOString() : null }),
+      body: JSON.stringify({ description, latestStatus, meetLink, callDate: callDate ? new Date(`${callDate}T${callTime || "00:00"}`).toISOString() : null, customFields: customFieldValues }),
     }).then((r) => r.json());
     setDeal((d) => d ? { ...d, ...updated } : d); setSaving(false); onUpdated();
   };
@@ -164,6 +174,31 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
     if (!dealId || !confirm("Delete this update?")) return;
     await fetch(`/api/deals/${dealId}/activities/${id}`, { method: "DELETE" });
     setDeal((d) => d ? { ...d, activities: d.activities.filter((a) => a.id !== id) } : d);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const imageItems = Array.from(e.clipboardData.items).filter((i) => i.type.startsWith("image/"));
+    if (imageItems.length === 0) return;
+    e.preventDefault();
+    imageItems.forEach((item) => {
+      const blob = item.getAsFile();
+      if (!blob) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const data = ev.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 1200;
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width * scale; canvas.height = img.height * scale;
+          canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+          setPendingFiles((p) => [...p, { name: `screenshot-${Date.now()}.jpg`, type: "image/jpeg", size: blob.size, data: canvas.toDataURL("image/jpeg", 0.82) }]);
+        };
+        img.src = data;
+      };
+      reader.readAsDataURL(blob);
+    });
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,33 +249,6 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
 
   return (
     <>
-    {/* Lightbox */}
-    {lightbox && (
-      <div
-        style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(10,11,16,0.88)", display: "flex", alignItems: "center", justifyContent: "center" }}
-        onClick={() => setLightbox(null)}>
-        <div style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }} onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => setLightbox(null)}
-            style={{ position: "absolute", top: -14, right: -14, width: 30, height: 30, borderRadius: 999, background: "var(--paper)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-            <X size={15} color="var(--ink)" />
-          </button>
-          {lightbox.type.startsWith("image/") ? (
-            <img src={lightbox.data} alt={lightbox.name}
-              style={{ maxWidth: "88vw", maxHeight: "88vh", borderRadius: 10, objectFit: "contain", display: "block" }} />
-          ) : (
-            <div style={{ background: "var(--paper)", borderRadius: 12, padding: 32, textAlign: "center", minWidth: 280 }}>
-              <File size={48} color="var(--brand)" style={{ margin: "0 auto 16px" }} />
-              <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", margin: "0 0 6px" }}>{lightbox.name}</p>
-              <p style={{ fontSize: 12, color: "var(--stone)", margin: "0 0 20px" }}>{(lightbox.size / 1024).toFixed(1)} KB</p>
-              <a href={lightbox.data} download={lightbox.name}
-                style={{ height: 36, padding: "0 20px", background: "var(--brand)", color: "white", borderRadius: 999, textDecoration: "none", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                Download
-              </a>
-            </div>
-          )}
-        </div>
-      </div>
-    )}
     <SlideOver open={open} onClose={onClose} title="">
       {loading || !deal ? (
         <div className="flex h-40 items-center justify-center text-sm" style={{ color: "var(--stone)" }}>Loading…</div>
@@ -407,8 +415,7 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
                 </div>
 
                 {/* View Contact button */}
-                <button onClick={() => setView("contact")}
-                  style={{ marginTop: 10, height: 26, padding: "0 10px", fontSize: 11, fontWeight: 600, color: "var(--brand)", background: "var(--brand-wash)", border: "none", borderRadius: 999, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <button onClick={() => setView("contact")} className="btn xs" style={{ marginTop: 10, background: "var(--brand-wash)", color: "var(--brand-deep)", borderColor: "transparent" }}>
                   <User size={11} /> View full contact
                 </button>
               </div>
@@ -495,12 +502,8 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
                               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(a.id); } if (e.key === "Escape") { setEditingId(null); setEditingBody(""); } }}
                               style={{ ...inp.style, border: "1px solid var(--brand)", borderRadius: 6, padding: "8px 10px", fontSize: 13, resize: "none", outline: "none", width: "100%" }} />
                             <div className="flex gap-2">
-                              <button onClick={() => saveEdit(a.id)} style={{ height: 24, padding: "0 10px", background: "var(--brand)", color: "white", borderRadius: 999, border: "none", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                <Check size={11} /> Save
-                              </button>
-                              <button onClick={() => { setEditingId(null); setEditingBody(""); }} style={{ height: 24, padding: "0 10px", background: "transparent", color: "var(--stone)", border: "1px solid var(--mist)", borderRadius: 999, fontSize: 11, cursor: "pointer" }}>
-                                Cancel
-                              </button>
+                              <button onClick={() => saveEdit(a.id)} className="btn brand xs"><Check size={11} /> Save</button>
+                              <button onClick={() => { setEditingId(null); setEditingBody(""); }} className="btn secondary xs">Cancel</button>
                             </div>
                           </div>
                         ) : (
@@ -510,7 +513,7 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
                             {(a.attachments ?? []).length > 0 && (
                               <div className="flex flex-wrap gap-2 mt-2">
                                 {(a.attachments ?? []).map((att, ai) => (
-                                  <button key={ai} onClick={() => setLightbox(att)}
+                                  <button key={ai} onClick={() => onOpenLightbox?.(att)}
                                     style={{ background: "var(--cloud)", border: "1px solid var(--mist)", borderRadius: 6, padding: 0, cursor: "pointer", overflow: "hidden", width: 72, height: 72, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                                     {att.type.startsWith("image/") ? (
                                       <img src={att.data} alt={att.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -623,13 +626,40 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
                     {render}
                   </div>
                 ))}
+                {/* Custom Fields */}
+                {customFieldDefs.length > 0 && (
+                  <div style={{ borderTop: "1px solid var(--cloud-2)", paddingTop: 16 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fog)", marginBottom: 12 }}>Custom Fields</p>
+                    <div className="space-y-4">
+                      {customFieldDefs.map((def) => (
+                        <div key={def.id}>
+                          <label style={{ display: "block", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fog)", marginBottom: 8 }}>{def.name}</label>
+                          {def.fieldType === "select" ? (
+                            <select value={customFieldValues[def.id] ?? ""}
+                              onChange={(e) => setCustomFieldValues((v) => ({ ...v, [def.id]: e.target.value }))}
+                              style={{ ...inp.style, border: "1px solid var(--mist)", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", width: "100%", cursor: "pointer" }}>
+                              <option value="">— select —</option>
+                              {def.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          ) : (
+                            <input
+                              type={def.fieldType === "number" ? "number" : def.fieldType === "date" ? "date" : def.fieldType === "url" ? "url" : "text"}
+                              value={customFieldValues[def.id] ?? ""}
+                              onChange={(e) => setCustomFieldValues((v) => ({ ...v, [def.id]: e.target.value }))}
+                              style={{ ...inp.style, border: "1px solid var(--mist)", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", width: "100%" }}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between pt-2">
-                  <button onClick={removeFromPipeline} disabled={removing}
-                    style={{ height: 32, padding: "0 12px", background: "transparent", color: "var(--rose)", border: "1px solid var(--rose-wash)", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, opacity: removing ? 0.6 : 1 }}>
+                  <button onClick={removeFromPipeline} disabled={removing} className="btn danger sm">
                     <Trash2 size={12} /> {removing ? "Removing…" : "Remove from Pipeline"}
                   </button>
-                  <button onClick={saveInfo} disabled={saving}
-                    style={{ height: 32, padding: "0 16px", background: "var(--ink)", color: "white", border: "none", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
+                  <button onClick={saveInfo} disabled={saving} className="btn primary sm">
                     {saving ? "Saving…" : "Save"}
                   </button>
                 </div>
@@ -643,14 +673,8 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
               <div className="flex gap-1.5 mb-2">
                 {["note", "call", "update"].map((v) => (
                   <button key={v} type="button" onClick={() => setActivityType(v)}
-                    style={{
-                      height: 24, padding: "0 10px", fontSize: 11, fontWeight: 600,
-                      borderRadius: 999, cursor: "pointer", border: "1px solid",
-                      borderColor: activityType === v ? "var(--brand)" : "var(--mist)",
-                      background: activityType === v ? "var(--brand-wash)" : "transparent",
-                      color: activityType === v ? "var(--brand-deep)" : "var(--stone)",
-                      transition: "all 0.15s", textTransform: "capitalize",
-                    }}>
+                    className={activityType === v ? "btn xs" : "btn ghost xs"}
+                    style={activityType === v ? { background: "var(--brand-wash)", color: "var(--brand-deep)", borderColor: "var(--brand)", textTransform: "capitalize" } : { textTransform: "capitalize" }}>
                     {v}
                   </button>
                 ))}
@@ -660,7 +684,8 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
                 <div style={{ border: "1px solid var(--mist)", borderRadius: 10, overflow: "hidden", background: "var(--paper)" }}>
                   <textarea value={activityBody} onChange={(e) => setActivityBody(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); postActivity(e); } }}
-                    rows={3} placeholder="Add a note, log a call… Enter to post"
+                    onPaste={handlePaste}
+                    rows={3} placeholder="Add a note, log a call… Enter to post  ·  Ctrl+V to paste screenshot"
                     style={{ display: "block", width: "100%", border: 0, outline: "none", resize: "none", padding: "10px 12px", fontSize: 13, color: "var(--ink)", background: "transparent", fontFamily: "var(--font-sans)" }} />
                   {/* Pending file previews */}
                   {pendingFiles.length > 0 && (
@@ -692,8 +717,7 @@ export default function DealDetailPanel({ dealId, open, onClose, onUpdated, onRe
                       <span style={{ fontSize: 11, color: "var(--brand)", fontWeight: 500 }}>{pendingFiles.length} file{pendingFiles.length > 1 ? "s" : ""}</span>
                     )}
                     <div style={{ flex: 1 }} />
-                    <button type="submit" disabled={posting || (!activityBody.trim() && pendingFiles.length === 0)}
-                      style={{ height: 28, padding: "0 12px", background: "var(--ink)", color: "white", borderRadius: 999, border: "none", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, opacity: (posting || (!activityBody.trim() && pendingFiles.length === 0)) ? 0.4 : 1, transition: "opacity 0.15s" }}>
+                    <button type="submit" disabled={posting || (!activityBody.trim() && pendingFiles.length === 0)} className="btn primary sm">
                       <Send size={12} /> Post
                     </button>
                   </div>

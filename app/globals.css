@@ -154,6 +154,37 @@
   letter-spacing: -0.005em;
 }
 
+/* ── Button system ───────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  font-family: var(--font-sans);
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s, color 0.15s;
+  text-decoration: none;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.primary  { background: var(--ink);    color: white;          border-color: transparent; }
+.btn.brand    { background: var(--brand);  color: white;          border-color: transparent; }
+.btn.secondary{ background: var(--paper);  color: var(--ink);     border-color: var(--mist); }
+.btn.ghost    { background: transparent;   color: var(--slate);   border-color: transparent; }
+.btn.danger   { background: var(--paper);  color: var(--rose);    border-color: var(--rose-wash); }
+.btn.sm  { height: 28px; padding: 0 10px; font-size: 12px; }
+.btn.xs  { height: 24px; padding: 0 8px;  font-size: 11px; }
+.btn.icon         { padding: 0; width: 36px; }
+.btn.icon.sm      { padding: 0; width: 28px; }
+.btn.icon.xs      { padding: 0; width: 24px; }
+
 /* ── Utility ─────────────────────────────────────────────────────────────── */
 .font-mono  { font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace; }
 .font-display { font-family: var(--font-display), var(--font-sans), sans-serif; }

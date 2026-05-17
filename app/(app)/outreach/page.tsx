@@ -192,13 +192,10 @@ export default function OutreachPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => exportCSV(contacts, "contacts.csv")}
-            style={{ height: 36, padding: "0 14px", background: "transparent", color: "var(--stone)", borderRadius: 999, border: "1px solid var(--mist)", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => exportCSV(contacts, "contacts.csv")} className="btn secondary">
             <Download size={14} /> Export CSV
           </button>
-          <button
-            onClick={() => { setEditing(null); setModalOpen(true); }}
-            style={{ height: 36, padding: "0 14px", background: "var(--ink)", color: "white", borderRadius: 999, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => { setEditing(null); setModalOpen(true); }} className="btn primary">
             <Plus size={14} /> New contact
           </button>
         </div>
@@ -276,7 +273,7 @@ export default function OutreachPage() {
           {/* Add to list */}
           <div style={{ position: "relative" }}>
             <button onClick={() => setBulkAction(bulkAction === "list" ? null : "list")}
-              style={{ height: 28, padding: "0 12px", fontSize: 12, fontWeight: 500, background: "#1F2330", color: "white", border: "1px solid #2A2D36", borderRadius: 999, cursor: "pointer" }}>
+              className="btn sm" style={{ background: "#1F2330", color: "white", borderColor: "#2A2D36" }}>
               Add to list
             </button>
             {bulkAction === "list" && (
@@ -297,7 +294,7 @@ export default function OutreachPage() {
           {/* Set status */}
           <div style={{ position: "relative" }}>
             <button onClick={() => setBulkAction(bulkAction === "status" ? null : "status")}
-              style={{ height: 28, padding: "0 12px", fontSize: 12, fontWeight: 500, background: "#1F2330", color: "white", border: "1px solid #2A2D36", borderRadius: 999, cursor: "pointer" }}>
+              className="btn sm" style={{ background: "#1F2330", color: "white", borderColor: "#2A2D36" }}>
               Set status
             </button>
             {bulkAction === "status" && (
@@ -414,21 +411,15 @@ export default function OutreachPage() {
                   </td>
                   <td>
                     <div className="flex items-center gap-0.5 justify-end">
-                      <button onClick={() => openEdit(c)} title="Edit"
-                        style={{ width: 28, height: 28, borderRadius: 6, background: "transparent", border: 0, cursor: "pointer", color: "var(--fog)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                        className="hover:bg-cloud hover:text-graphite transition-colors">
+                      <button onClick={() => openEdit(c)} title="Edit" className="btn ghost icon sm">
                         <Pencil size={13} />
                       </button>
                       {c.status !== "in_pipeline" && (
-                        <button onClick={() => openMoveToPipeline(c)} title="Move to Pipeline"
-                          style={{ width: 28, height: 28, borderRadius: 6, background: "transparent", border: 0, cursor: "pointer", color: "var(--fog)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                          className="hover:bg-brand-wash hover:text-brand transition-colors">
+                        <button onClick={() => openMoveToPipeline(c)} title="Move to Pipeline" className="btn ghost icon sm" style={{ color: "var(--brand)" }}>
                           <ArrowRight size={13} />
                         </button>
                       )}
-                      <button onClick={() => deleteContact(c.id)} title="Delete"
-                        style={{ width: 28, height: 28, borderRadius: 6, background: "transparent", border: 0, cursor: "pointer", color: "var(--fog)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                        className="hover:bg-rose-50 hover:text-rose transition-colors">
+                      <button onClick={() => deleteContact(c.id)} title="Delete" className="btn ghost icon sm" style={{ color: "var(--rose)" }}>
                         <Trash2 size={13} />
                       </button>
                     </div>

@@ -392,20 +392,10 @@ export default function ListDetailPage() {
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button onClick={exportCSV} title="Export CSV"
-            style={{ height: 36, padding: "0 12px", background: "transparent", border: "1px solid var(--mist)", borderRadius: 999, fontSize: 12, fontWeight: 500, color: "var(--stone)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <Download size={13} /> Export
-          </button>
-          <button onClick={deleteList} title="Delete list" className="rounded-md border border-red-200 p-2 text-red-500 hover:bg-red-50">
-            <Trash2 size={15} />
-          </button>
+          <button onClick={exportCSV} className="btn secondary"><Download size={13} /> Export</button>
+          <button onClick={deleteList} className="btn danger icon sm"><Trash2 size={14} /></button>
           <ColumnManager activeColumns={activeColumns} onChange={handleColumnsChange} />
-          <button
-            onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            <Plus size={15} /> Add Contact
-          </button>
+          <button onClick={() => setModalOpen(true)} className="btn primary"><Plus size={14} /> Add Contact</button>
         </div>
       </div>
 

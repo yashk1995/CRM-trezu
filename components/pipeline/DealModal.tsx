@@ -104,7 +104,7 @@ export default function DealModal({ open, onClose, onSaved, deal, stages, defaul
     onClose();
   };
 
-  const inputCls = "w-full rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500";
+  const inputCls = "w-full rounded-[6px] border border-[var(--mist)] bg-[var(--paper)] px-3 py-1.5 text-[13px] text-[var(--ink)] outline-none focus:border-[var(--brand)] focus:shadow-[0_0_0_3px_var(--brand-wash)]";
   const modalTitle = deal
     ? `Deal — ${displayName(deal.contact)}`
     : "Add Deal";
@@ -182,10 +182,9 @@ export default function DealModal({ open, onClose, onSaved, deal, stages, defaul
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="rounded-md px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100">Cancel</button>
-          <button type="submit" disabled={saving}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
-            {saving ? "Saving..." : deal ? "Save Changes" : "Add Deal"}
+          <button type="button" onClick={onClose} className="btn secondary">Cancel</button>
+          <button type="submit" disabled={saving} className="btn primary">
+            {saving ? "Saving…" : deal ? "Save Changes" : "Add Deal"}
           </button>
         </div>
       </form>

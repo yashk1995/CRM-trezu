@@ -14,12 +14,13 @@ import {
   useDroppable,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Trash2, Plus, CalendarDays, Link2, GripVertical } from "lucide-react";
+import { Trash2, Plus, CalendarDays, Link2, GripVertical, X, File } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import ContactAvatar from "@/components/ui/ContactAvatar";
 import DealModal from "@/components/pipeline/DealModal";
 import DealDetailPanel from "@/components/pipeline/DealDetailPanel";
 
+interface Attachment { name: string; type: string; size: number; data: string }
 interface Tag { id: string; name: string; color: string }
 interface Tier { id: string; label: string }
 interface Stage { id: string; name: string; color: string; order: number }
@@ -42,60 +43,57 @@ function DealCard({ deal, onDelete, onOpen, isActive, isSelected, onSelect }: {
   isSelected?: boolean; onSelect?: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: deal.id });
-  const style = {
-    transform: transform ? CSS.Translate.toString(transform) : undefined,
-    opacity: isActive ? 0.4 : 1,
-  };
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...attributes}
       onClick={() => onOpen(deal.id)}
       style={{
+        transform: transform ? CSS.Translate.toString(transform) : undefined,
         background: isSelected ? "var(--brand-wash)" : "var(--paper)",
         border: isSelected ? "1px solid var(--brand)" : "1px solid var(--mist)",
-        borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 6,
+        borderRadius: 8, padding: "12px 12px 12px 8px",
+        display: "flex", flexDirection: "column", gap: 8,
         cursor: "pointer", userSelect: "none", position: "relative",
         transition: "border-color 0.15s, box-shadow 0.15s, background 0.15s",
         opacity: isActive ? 0.4 : 1,
-        transform: style.transform,
       }}
       className="deal-card-hover group"
     >
-      {/* Selection checkbox — top-left overlay */}
+      {/* Checkbox — top-right, only visible on hover or when selected */}
       {onSelect && (
-        <div style={{ position: "absolute", top: 6, right: 6 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: "absolute", top: 8, right: 8 }} onClick={(e) => e.stopPropagation()}>
           <input type="checkbox" checked={isSelected} onChange={() => onSelect(deal.id)}
             style={{ cursor: "pointer", accentColor: "var(--brand)", width: 13, height: 13 }}
             className={isSelected ? "" : "opacity-0 group-hover:opacity-100"} />
         </div>
       )}
-    <div className="flex items-start gap-2">
+
+      {/* Row: grip handle | avatar | name */}
+      <div className="flex items-start gap-2">
+        {/* Drag grip — left side, always visible on hover */}
+        <span
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          style={{ color: "var(--fog)", cursor: "grab", flexShrink: 0, paddingTop: 3, marginLeft: -2 }}
+          className="opacity-0 group-hover:opacity-100 active:cursor-grabbing transition-opacity"
+        >
+          <GripVertical size={14} />
+        </span>
         <ContactAvatar
           logoUrl={deal.contact.logoUrl}
           name={deal.contact.companyName || deal.contact.name}
           size="sm"
         />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className="truncate text-[13px] font-semibold" style={{ color: "var(--ink)" }}>
-              {deal.contact.companyName || deal.contact.name}
-            </p>
-          </div>
+        <div className="flex-1 min-w-0" style={{ paddingRight: onSelect ? 16 : 0 }}>
+          <p className="truncate text-[13px] font-semibold" style={{ color: "var(--ink)" }}>
+            {deal.contact.companyName || deal.contact.name}
+          </p>
           {deal.contact.companyName && (
             <p className="truncate text-[11px]" style={{ color: "var(--fog)", marginTop: 2 }}>{deal.contact.name}</p>
           )}
         </div>
-        <span
-          {...listeners}
-          onClick={(e) => e.stopPropagation()}
-          style={{ color: "var(--mist)", cursor: "grab", flexShrink: 0 }}
-          className="hover:text-fog active:cursor-grabbing"
-        >
-          <GripVertical size={13} />
-        </span>
       </div>
 
       <div className="flex flex-wrap gap-1">
@@ -229,6 +227,7 @@ function PipelinePage() {
 
   const [detailDealId, setDetailDealId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [lightboxAtt, setLightboxAtt] = useState<Attachment | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
@@ -337,10 +336,7 @@ function PipelinePage() {
             Click a card to open · drag the grip icon to move between stages
           </p>
         </div>
-        <a href="/outreach"
-          style={{ height: 36, padding: "0 14px", background: "transparent", color: "var(--stone)", borderRadius: 999, border: "1px solid var(--mist)", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
-          Add contacts via Outreach →
-        </a>
+        <a href="/outreach" className="btn secondary">Add contacts via Outreach →</a>
       </div>
 
       {/* Bulk action bar */}
@@ -355,15 +351,10 @@ function PipelinePage() {
             <option value="">Select stage…</option>
             {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <button onClick={bulkMoveToStage} disabled={!bulkStageId}
-            style={{ height: 28, padding: "0 14px", background: "var(--brand)", color: "white", border: "none", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: bulkStageId ? 1 : 0.4, transition: "opacity 0.15s" }}>
-            Move
-          </button>
+          <button onClick={bulkMoveToStage} disabled={!bulkStageId} className="btn brand sm">Move</button>
           <div style={{ flex: 1 }} />
           <button onClick={() => { setSelectedDealIds(new Set()); setBulkStageId(""); }}
-            style={{ background: "transparent", border: 0, color: "#A6AAB4", cursor: "pointer", fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
-            ✕ Clear
-          </button>
+            className="btn ghost sm" style={{ color: "#A6AAB4" }}>✕ Clear</button>
         </div>
       )}
 
@@ -418,7 +409,34 @@ function PipelinePage() {
         onClose={() => setDetailOpen(false)}
         onUpdated={fetchAll}
         onRemoved={fetchAll}
+        onOpenLightbox={(att) => { setLightboxAtt(att); setDetailOpen(false); }}
       />
+
+      {/* Lightbox — rendered at page root so it's outside the SlideOver portal */}
+      {lightboxAtt && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(10,11,16,0.92)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => { setLightboxAtt(null); setDetailOpen(true); }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setLightboxAtt(null); setDetailOpen(true); }}
+            style={{ position: "fixed", top: 20, right: 20, width: 36, height: 36, borderRadius: 999, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "white", backdropFilter: "blur(8px)" }}>
+            <X size={16} />
+          </button>
+          <div style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }} onClick={(e) => e.stopPropagation()}>
+            {lightboxAtt.type.startsWith("image/") ? (
+              <img src={lightboxAtt.data} alt={lightboxAtt.name}
+                style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 12, objectFit: "contain", display: "block", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }} />
+            ) : (
+              <div style={{ background: "var(--paper)", borderRadius: 16, padding: 40, textAlign: "center", minWidth: 300 }}>
+                <File size={48} color="var(--brand)" style={{ margin: "0 auto 16px" }} />
+                <p style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", margin: "0 0 6px" }}>{lightboxAtt.name}</p>
+                <p style={{ fontSize: 13, color: "var(--stone)", margin: "0 0 24px" }}>{(lightboxAtt.size / 1024).toFixed(1)} KB</p>
+                <a href={lightboxAtt.data} download={lightboxAtt.name} className="btn brand">Download</a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

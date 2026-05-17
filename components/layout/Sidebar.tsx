@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard, Send, Kanban, SquareCheckBig, Settings,
-  List, Plus, Pencil, Trash2, Check, X, ChevronDown, Bell,
+  List, Plus, Pencil, Trash2, Check, X, ChevronDown, LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,12 +18,14 @@ const navItems = [
 
 interface CrmList { id: string; name: string; _count?: { contacts: number } }
 interface Counts  { contacts: number; deals: number; pendingTasks: number }
+interface Me      { name: string; email: string; role: string }
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const [lists,    setLists]    = useState<CrmList[]>([]);
   const [counts,   setCounts]   = useState<Counts | null>(null);
+  const [me,       setMe]       = useState<Me | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName,  setNewName]  = useState("");
   const createRef = useRef<HTMLInputElement>(null);
@@ -39,7 +41,8 @@ export default function Sidebar() {
   useEffect(() => {
     fetchLists();
     fetch("/api/counts").then((r) => r.json()).then(setCounts).catch(() => {});
-  }, []);
+    fetch("/api/auth/me").then((r) => r.ok ? r.json() : null).then((d) => d && setMe(d.user)).catch(() => {});
+  }, [pathname]);
   useEffect(() => { if (creating)  setTimeout(() => createRef.current?.focus(), 0); }, [creating]);
   useEffect(() => { if (editingId) setTimeout(() => editRef.current?.focus(),   0); }, [editingId]);
 
@@ -190,14 +193,15 @@ export default function Sidebar() {
                         </span>
                       )}
                     </Link>
-                    <div className="absolute right-2 hidden items-center gap-0.5 group-hover:flex">
+                    <div className="absolute right-2 hidden items-center gap-0.5 group-hover:flex"
+                      style={{ background: "var(--ink)", paddingLeft: 4, borderRadius: 4 }}>
                       <button onClick={(e) => { e.preventDefault(); setEditingId(list.id); setEditName(list.name); }}
-                        style={{ background: "transparent", border: 0, cursor: "pointer", padding: 4, color: "#6E7280" }}
+                        style={{ background: "transparent", border: 0, cursor: "pointer", padding: 4, color: "#6E7280", display: "inline-flex" }}
                         className="hover:text-zinc-200 rounded">
                         <Pencil size={10} />
                       </button>
                       <button onClick={(e) => { e.preventDefault(); deleteList(list); }}
-                        style={{ background: "transparent", border: 0, cursor: "pointer", padding: 4, color: "#6E7280" }}
+                        style={{ background: "transparent", border: 0, cursor: "pointer", padding: 4, color: "#6E7280", display: "inline-flex" }}
                         className="hover:text-red-400 rounded">
                         <Trash2 size={10} />
                       </button>
@@ -223,15 +227,30 @@ export default function Sidebar() {
           <span style={{ fontSize: 9, fontWeight: 600, color: "#6E7280", background: "#1F2330", padding: "2px 5px", borderRadius: 4 }}>⌘,</span>
         </Link>
 
-        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, padding: "6px 4px" }}>
-          <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--ink-2, #14161D)", border: "1px solid #2A2D36", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-            Y
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, padding: "6px 4px" }} className="group">
+          <div style={{ width: 24, height: 24, borderRadius: 6, background: "#1F2330", border: "1px solid #2A2D36", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+            {me ? me.name[0].toUpperCase() : "?"}
           </div>
           <div className="flex-1 min-w-0">
-            <div style={{ fontSize: 11, fontWeight: 600, color: "white" }}>Yash Kapur</div>
-            <div style={{ fontSize: 10, color: "#6E7280", fontFamily: "var(--font-mono, monospace)", marginTop: 2 }}>admin</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "white" }} className="truncate">{me?.name ?? "—"}</div>
+            <div style={{ fontSize: 10, color: "#6E7280", fontFamily: "var(--font-mono, monospace)", marginTop: 2 }}>{me?.role ?? ""}</div>
           </div>
-          <span style={{ width: 8, height: 8, borderRadius: 999, background: "#3CD68A", boxShadow: "0 0 0 2px #0A0B10" }} />
+          <button
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+            }}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              background: "transparent", border: "1px solid #2A2D36",
+              borderRadius: 6, cursor: "pointer", color: "#6E7280",
+              padding: "4px 8px", fontSize: 11, fontWeight: 500,
+              transition: "all 0.15s", whiteSpace: "nowrap",
+            }}
+            className="hover:border-rose-800 hover:text-red-400 transition-colors">
+            <LogOut size={11} />
+            Sign out
+          </button>
         </div>
       </div>
     </aside>

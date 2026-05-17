@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, UNAUTH } from "@/lib/api-auth";
 
 const OUTREACH_STATUSES = ["not_contacted", "dm_sent", "rejected"];
 
@@ -10,6 +11,8 @@ const OUTREACH_STAGE_LABELS: Record<string, string> = {
 };
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireAuth();
+  if (!session) return UNAUTH();
   const listContacts = await prisma.listContact.findMany({
     where: { listId: params.id },
     orderBy: { addedAt: "asc" },
@@ -54,6 +57,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireAuth();
+  if (!session) return UNAUTH();
   const body = await req.json();
   const { contactId } = body;
 

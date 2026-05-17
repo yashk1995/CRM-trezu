@@ -8,7 +8,7 @@ import { format } from "date-fns";
 interface Stage    { id: string; name: string; color: string; order: number; dealCount: number }
 interface Activity {
   id: string; type: string; body: string | null; createdAt: string;
-  deal: { contact: { id: string; name: string; companyName: string | null; logoUrl: string | null } } | null;
+  deal: { id: string; contact: { id: string; name: string; companyName: string | null; logoUrl: string | null } } | null;
 }
 interface DashData {
   totalContacts: number;
@@ -218,7 +218,7 @@ export default function DashboardPage() {
               const name    = contact ? (contact.companyName || contact.name) : "Unknown";
               const style   = ACTIVITY_ICONS[a.type] ?? ACTIVITY_ICONS.note;
               return (
-                <div key={a.id} className="flex items-start gap-3" style={{
+                <div key={a.id} className="flex items-start gap-3 group" style={{
                   padding: "12px 18px",
                   borderBottom: i < recentActivities.length - 1 ? "1px solid var(--cloud-2)" : "none",
                 }}>
@@ -233,6 +233,15 @@ export default function DashboardPage() {
                       {format(new Date(a.createdAt), "MMM d, yyyy · h:mm a")}
                     </p>
                   </div>
+                  {a.deal && (
+                    <a
+                      href={`/pipeline?openDeal=${a.deal.id}`}
+                      style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, height: 26, padding: "0 10px", fontSize: 11, fontWeight: 500, color: "var(--brand)", background: "var(--brand-wash)", borderRadius: 999, textDecoration: "none", border: "none", transition: "background 0.15s" }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      Open deal <ArrowUpRight size={11} />
+                    </a>
+                  )}
                 </div>
               );
             })}

@@ -8,6 +8,7 @@ import { Camera, X } from "lucide-react";
 
 interface Tier { id: string; label: string }
 interface Tag { id: string; name: string; color: string }
+interface CustomFieldDef { id: string; name: string; fieldType: string; options: string[] }
 
 interface ContactFormData {
   name: string;
@@ -23,25 +24,29 @@ interface ContactFormData {
   tierId: string;
   tagIds: string[];
   notes: string;
+  customFields: Record<string, string>;
 }
 
 const EMPTY: ContactFormData = {
   name: "", companyName: "", pocUsername: "", groupLink: "", logoUrl: "",
   email: "", phone: "", telegramUsername: "", twitterHandle: "",
-  status: "not_contacted", tierId: "", tagIds: [], notes: "",
+  status: "not_contacted", tierId: "", tagIds: [], notes: "", customFields: {},
 };
+
+type ContactFormInitial = { [K in keyof ContactFormData]?: ContactFormData[K] | null } & { id?: string };
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
-  initial?: Partial<ContactFormData> & { id?: string };
+  initial?: ContactFormInitial;
 }
 
 export default function ContactFormModal({ open, onClose, onSaved, initial }: Props) {
   const [form, setForm] = useState<ContactFormData>(EMPTY);
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
   const [newTag, setNewTag] = useState("");
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -49,14 +54,27 @@ export default function ContactFormModal({ open, onClose, onSaved, initial }: Pr
   useEffect(() => {
     fetch("/api/tiers").then((r) => r.json()).then(setTiers);
     fetch("/api/tags").then((r) => r.json()).then(setTags);
+    fetch("/api/custom-field-definitions?appliesTo=contact").then((r) => r.json()).then(setCustomFieldDefs);
   }, []);
 
   useEffect(() => {
-    if (open) setForm(initial ? { ...EMPTY, ...initial } : EMPTY);
+    if (open) {
+      if (initial) {
+        const clean = Object.fromEntries(
+          Object.entries(initial).filter(([, v]) => v !== null)
+        ) as Partial<ContactFormData>;
+        setForm({ ...EMPTY, ...clean });
+      } else {
+        setForm(EMPTY);
+      }
+    }
   }, [open, initial]);
 
-  const set = (key: keyof ContactFormData, value: string | string[]) =>
+  const set = (key: keyof ContactFormData, value: string | string[] | Record<string, string>) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const setCustomField = (defId: string, value: string) =>
+    setForm((f) => ({ ...f, customFields: { ...f.customFields, [defId]: value } }));
 
   const toggleTag = (id: string) =>
     set("tagIds", form.tagIds.includes(id) ? form.tagIds.filter((t) => t !== id) : [...form.tagIds, id]);
@@ -114,7 +132,7 @@ export default function ContactFormModal({ open, onClose, onSaved, initial }: Pr
     onClose();
   };
 
-  const inputCls = "w-full rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500";
+  const inputCls = "w-full rounded-[6px] border border-[var(--mist)] bg-[var(--paper)] px-3 py-1.5 text-[13px] text-[var(--ink)] outline-none focus:border-[var(--brand)] focus:shadow-[0_0_0_3px_var(--brand-wash)]";
   const displayName = form.companyName || form.name || "?";
 
   return (
@@ -251,11 +269,38 @@ export default function ContactFormModal({ open, onClose, onSaved, initial }: Pr
             onChange={(e) => set("notes", e.target.value)} placeholder="Any notes…" />
         </div>
 
+        {/* ── Custom Fields ─────────────────────────────────────────────────── */}
+        {customFieldDefs.length > 0 && (
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Custom Fields</p>
+            <div className="space-y-3">
+              {customFieldDefs.map((def) => (
+                <div key={def.id}>
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">{def.name}</label>
+                  {def.fieldType === "select" ? (
+                    <select className={inputCls} value={form.customFields[def.id] ?? ""}
+                      onChange={(e) => setCustomField(def.id, e.target.value)}>
+                      <option value="">— select —</option>
+                      {def.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      className={inputCls}
+                      type={def.fieldType === "number" ? "number" : def.fieldType === "date" ? "date" : def.fieldType === "url" ? "url" : "text"}
+                      value={form.customFields[def.id] ?? ""}
+                      onChange={(e) => setCustomField(def.id, e.target.value)}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="rounded-md px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100">Cancel</button>
-          <button type="submit" disabled={saving}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
-            {saving ? "Saving..." : initial?.id ? "Save Changes" : "Add Contact"}
+          <button type="button" onClick={onClose} className="btn secondary">Cancel</button>
+          <button type="submit" disabled={saving} className="btn primary">
+            {saving ? "Saving…" : initial?.id ? "Save Changes" : "Add Contact"}
           </button>
         </div>
       </form>
