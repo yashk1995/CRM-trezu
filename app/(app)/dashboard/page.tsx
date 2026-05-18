@@ -18,7 +18,23 @@ interface DashData {
   pendingTasks: number;
   completedTasks: number;
   recentActivities: Activity[];
+  period: {
+    range: number;
+    newContacts: number;
+    newDeals: number;
+    completedTasks: number;
+    activities: number;
+  };
 }
+
+type Range = 0 | 7 | 15 | 30;
+
+const RANGES: { value: Range; label: string }[] = [
+  { value: 7,  label: "7D"  },
+  { value: 15, label: "15D" },
+  { value: 30, label: "1M"  },
+  { value: 0,  label: "All" },
+];
 
 const ACTIVITY_ICONS: Record<string, { bg: string; color: string; icon: string }> = {
   note:     { bg: "var(--cloud-2)",    color: "var(--slate)",      icon: "📝" },
@@ -77,24 +93,65 @@ function PanelH({ title, sub, right }: { title: string; sub?: string; right?: Re
   );
 }
 
+function RangeToggle({ range, setRange }: { range: Range; setRange: (r: Range) => void }) {
+  return (
+    <div style={{
+      display: "inline-flex",
+      background: "var(--cloud-2)",
+      borderRadius: 999,
+      padding: 3,
+      gap: 2,
+    }}>
+      {RANGES.map((r) => (
+        <button
+          key={r.value}
+          onClick={() => setRange(r.value)}
+          style={{
+            padding: "4px 14px",
+            borderRadius: 999,
+            border: "none",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+            background: range === r.value ? "var(--paper)" : "transparent",
+            color: range === r.value ? "var(--ink)" : "var(--stone)",
+            boxShadow: range === r.value ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            transition: "all 0.15s",
+            lineHeight: 1,
+          }}
+        >
+          {r.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
-  const [data, setData]     = useState<DashData | null>(null);
+  const [data, setData]       = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange]     = useState<Range>(7);
 
   useEffect(() => {
-    const cached = cacheGet<DashData>("dashboard");
+    const cacheKey = `dashboard:${range}`;
+    const cached = cacheGet<DashData>(cacheKey);
     if (cached) {
       setData(cached);
       setLoading(false);
+    } else {
+      setLoading(true);
     }
-    fetch("/api/dashboard")
+    fetch(`/api/dashboard?range=${range}`)
       .then((r) => r.json())
       .then((d) => {
-        cacheSet("dashboard", d);
+        cacheSet(cacheKey, d);
         setData(d);
-        if (!cached) setLoading(false);
+        setLoading(false);
       });
-  }, []);
+  }, [range]);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   if (loading || !data) {
     return (
@@ -104,8 +161,12 @@ export default function DashboardPage() {
             {format(new Date(), "EEEE · d MMMM yyyy")}
           </p>
           <h1 style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 28, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)" }}>
-            Good morning
+            {greeting}
           </h1>
+        </div>
+        <div className="flex items-center justify-between">
+          <span style={{ fontSize: 12, color: "var(--fog)", fontWeight: 500 }}>Period overview</span>
+          <RangeToggle range={range} setRange={setRange} />
         </div>
         <div className="grid grid-cols-4 gap-3">
           {[...Array(4)].map((_, i) => (
@@ -116,12 +177,12 @@ export default function DashboardPage() {
     );
   }
 
-  const { totalContacts, statusMap, pipeline, pendingTasks, completedTasks, recentActivities } = data;
+  const { totalContacts, statusMap, pipeline, pendingTasks, completedTasks, recentActivities, period } = data;
   const inPipeline = statusMap["in_pipeline"] ?? 0;
   const totalDeals = pipeline.reduce((s, p) => s + p.dealCount, 0);
   const maxDeals   = Math.max(...pipeline.map((s) => s.dealCount), 1);
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const rangeLabel   = range === 0 ? "all time" : range === 30 ? "1 month" : `${range} days`;
+  const periodPrefix = range === 0 ? "" : "last ";
 
   return (
     <div className="space-y-5">
@@ -142,12 +203,37 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI strip */}
+      {/* Period selector row — right-aligned, just above KPI cards */}
+      <div className="flex items-center justify-between">
+        <span style={{ fontSize: 12, color: "var(--fog)", fontWeight: 500 }}>
+          Period overview · {periodPrefix}{rangeLabel}
+        </span>
+        <RangeToggle range={range} setRange={setRange} />
+      </div>
+
+      {/* KPI strip — period-aware */}
       <div className="grid gap-3" style={{ gridTemplateColumns: "1.2fr 1fr 1fr 1fr" }}>
-        <StatCard dark label="Active pipeline" value={`${totalDeals} deals`} sub={`across ${pipeline.filter((s) => s.dealCount > 0).length} stages`} />
-        <StatCard label="Total contacts" value={totalContacts} sub={`${totalContacts - inPipeline} outreach · ${inPipeline} pipeline`} />
-        <StatCard label="Pending tasks" value={pendingTasks} sub="open items" />
-        <StatCard label="Completed tasks" value={completedTasks} sub="total closed" />
+        <StatCard
+          dark
+          label="New deals"
+          value={period.newDeals}
+          sub={`${periodPrefix}${rangeLabel} · ${totalDeals} in pipeline`}
+        />
+        <StatCard
+          label="New contacts"
+          value={period.newContacts}
+          sub={`${periodPrefix}${rangeLabel} · ${totalContacts} total`}
+        />
+        <StatCard
+          label="Tasks completed"
+          value={period.completedTasks}
+          sub={`${periodPrefix}${rangeLabel} · ${pendingTasks} pending`}
+        />
+        <StatCard
+          label="Activities"
+          value={period.activities}
+          sub={`${periodPrefix}${rangeLabel}`}
+        />
       </div>
 
       {/* Charts row */}
@@ -160,7 +246,6 @@ export default function DashboardPage() {
             </a>
           } />
           <div style={{ padding: 18 }}>
-            {/* Stacked bar */}
             <div style={{ display: "flex", height: 10, borderRadius: 999, overflow: "hidden", background: "var(--cloud-2)", marginBottom: 18 }}>
               {pipeline.map((s) => (
                 <div key={s.id} style={{ width: `${(s.dealCount / Math.max(totalDeals, 1)) * 100}%`, background: s.color }} />
@@ -218,11 +303,11 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent activity */}
+      {/* Recent activity — filtered to selected period */}
       <Card>
-        <PanelH title="Recent activity" sub="live" />
+        <PanelH title="Recent activity" sub={`${periodPrefix}${rangeLabel}`} />
         {recentActivities.length === 0 ? (
-          <p style={{ padding: "24px 18px", fontSize: 13, color: "var(--stone)" }}>No activity yet.</p>
+          <p style={{ padding: "24px 18px", fontSize: 13, color: "var(--stone)" }}>No activity in this period.</p>
         ) : (
           <div>
             {recentActivities.map((a, i) => {
