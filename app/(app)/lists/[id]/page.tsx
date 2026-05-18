@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { cacheGet, cacheSet, cacheInvalidate } from "@/lib/cache";
 import { useParams, useRouter } from "next/navigation";
-import { Trash2, Plus, Columns, Check, ChevronDown, Download, X } from "lucide-react";
+import { Trash2, Plus, Columns, Check, ChevronDown, Download, X, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import DealDetailPanel from "@/components/pipeline/DealDetailPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ interface Tag { id: string; name: string; color: string }
 interface Tier { id: string; label: string }
 interface Stage { id: string; name: string; color: string }
 interface Deal {
+  id: string;
   stage: Stage | null;
   latestStatus: string | null;
   callDate: string | null;
@@ -249,6 +251,7 @@ export default function ListDetailPage() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkRemoving, setBulkRemoving] = useState(false);
+  const [panelDealId, setPanelDealId] = useState<string | null>(null);
 
   useEffect(() => { if (id) setActiveColumns(loadColumns(id)); }, [id]);
 
@@ -556,13 +559,24 @@ export default function ListDetailPage() {
                     </td>
                     {activeColumns.map((key) => <td key={key} className="px-4 py-3">{renderCell(lc, key)}</td>)}
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => fetch(`/api/lists/${id}/contacts/${lc.contact.id}`, { method: "DELETE" }).then(refreshContacts)}
-                        title="Remove from list"
-                        className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center justify-end gap-0.5">
+                        {lc.contact.deals[0] && (
+                          <button
+                            onClick={() => setPanelDealId(lc.contact.deals[0].id)}
+                            title="View deal"
+                            className="rounded p-1.5 text-zinc-400 hover:bg-indigo-50 hover:text-indigo-600"
+                          >
+                            <ArrowRight size={14} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => fetch(`/api/lists/${id}/contacts/${lc.contact.id}`, { method: "DELETE" }).then(refreshContacts)}
+                          title="Remove from list"
+                          className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -578,6 +592,13 @@ export default function ListDetailPage() {
         listId={id}
         serverInListIds={serverInListIds}
         onListChanged={refreshContacts}
+      />
+
+      <DealDetailPanel
+        dealId={panelDealId}
+        open={!!panelDealId}
+        onClose={() => setPanelDealId(null)}
+        onUpdated={refreshContacts}
       />
     </div>
   );
