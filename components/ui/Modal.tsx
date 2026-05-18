@@ -19,11 +19,11 @@ export default function Modal({ open, onClose, title, children, className }: Mod
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
         <Dialog.Content
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-xl focus:outline-none",
+            "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white shadow-xl focus:outline-none flex flex-col max-h-[90vh]",
             className
           )}
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-6 py-4">
             <Dialog.Title className="text-base font-semibold text-zinc-900">
               {title}
             </Dialog.Title>
@@ -34,7 +34,9 @@ export default function Modal({ open, onClose, title, children, className }: Mod
               <X size={16} />
             </button>
           </div>
-          {children}
+          <div className="overflow-y-auto min-h-0 flex-1 p-6">
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
