@@ -265,7 +265,7 @@ function PipelinePage() {
 
   // Initial load: stages gate the board render; deals load in background
   useEffect(() => {
-    const cachedStages = cacheGet<Stage[]>("pipeline-stages", 300_000); // 5 min TTL
+    const cachedStages = cacheGet<Stage[]>("pipeline-stages");
     const cachedDeals  = cacheGet<Deal[]>("pipeline-deals");
 
     if (cachedStages) { setStages(cachedStages); setLoading(false); }
@@ -311,13 +311,13 @@ function PipelinePage() {
     // Lazy-load contacts — only needed for the modal, not for the board
     if (contactsLoadedRef.current) return;
     contactsLoadedRef.current = true;
-    const cached = cacheGet<typeof allContacts>("contacts-slim", 120_000);
+    const cached = cacheGet<typeof allContacts>("contacts:slim");
     if (cached) { setAllContacts(cached); return; }
     fetch("/api/contacts")
       .then((r) => r.json())
       .then((data: any[]) => {
         const slim = data.map((c) => ({ id: c.id, name: c.name, companyName: c.companyName ?? null, logoUrl: c.logoUrl ?? null }));
-        cacheSet("contacts-slim", slim);
+        cacheSet("contacts:slim", slim);
         setAllContacts(slim);
       });
   };

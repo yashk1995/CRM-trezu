@@ -91,8 +91,8 @@ export default function OutreachPage() {
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
   useEffect(() => {
-    const cachedTiers = cacheGet<Tier[]>("tiers", 300_000);
-    const cachedTags  = cacheGet<Tag[]>("tags",   300_000);
+    const cachedTiers = cacheGet<Tier[]>("tiers");
+    const cachedTags  = cacheGet<Tag[]>("tags");
     if (cachedTiers) setTiers(cachedTiers);
     if (cachedTags)  setTags(cachedTags);
     if (!cachedTiers) fetch("/api/tiers").then((r) => r.json()).then((d) => { cacheSet("tiers", d); setTiers(d); });

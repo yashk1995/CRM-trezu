@@ -2,11 +2,12 @@ type Entry<T> = { data: T; ts: number };
 
 const store = new Map<string, Entry<unknown>>();
 
-export function cacheGet<T>(key: string, ttlMs = 30_000): T | null {
+// Always returns cached data regardless of age — stale-while-revalidate.
+// Loading states are only shown on the very first fetch (no entry at all).
+// Mutations call cacheInvalidate/cacheClearPrefix to force fresh fetches.
+export function cacheGet<T>(key: string): T | null {
   const e = store.get(key);
-  if (!e) return null;
-  if (Date.now() - e.ts > ttlMs) { store.delete(key); return null; }
-  return e.data as T;
+  return e ? (e.data as T) : null;
 }
 
 export function cacheSet<T>(key: string, data: T): void {
