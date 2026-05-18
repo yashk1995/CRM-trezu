@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cacheGet, cacheSet, cacheInvalidate } from "@/lib/cache";
 import { useParams, useRouter } from "next/navigation";
-import { Trash2, Plus, Columns, Check, ChevronDown, Download } from "lucide-react";
+import { Trash2, Plus, Columns, Check, ChevronDown, Download, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
@@ -26,7 +26,7 @@ interface Contact {
   tier: Tier | null; contactTags: { tag: Tag }[]; deals: Deal[];
 }
 interface PickerContact {
-  id: string; name: string; email: string | null;
+  id: string; name: string; companyName: string | null; email: string | null;
   telegramUsername: string | null; twitterHandle: string | null;
   status: string;
 }
@@ -123,7 +123,6 @@ function AddContactModal({
   const [search, setSearch] = useState("");
   const hasFetched = useRef(false);
 
-  // Fetch contacts once (they rarely change)
   useEffect(() => {
     if (hasFetched.current) return;
     hasFetched.current = true;
@@ -133,7 +132,6 @@ function AddContactModal({
       .catch(() => {});
   }, []);
 
-  // Sync server state into local when modal opens
   useEffect(() => {
     if (open) {
       setSearch("");
@@ -147,6 +145,7 @@ function AddContactModal({
         const q = search.toLowerCase();
         return (
           c.name.toLowerCase().includes(q) ||
+          (c.companyName ?? "").toLowerCase().includes(q) ||
           (c.telegramUsername ?? "").toLowerCase().includes(q) ||
           (c.twitterHandle ?? "").toLowerCase().includes(q) ||
           (c.email ?? "").toLowerCase().includes(q)
@@ -155,7 +154,6 @@ function AddContactModal({
 
   const toggle = async (c: PickerContact) => {
     const inList = inListIds.has(c.id);
-    // Instant optimistic update
     setInListIds((prev) => {
       const next = new Set(prev);
       if (inList) next.delete(c.id); else next.add(c.id);
@@ -177,7 +175,7 @@ function AddContactModal({
     <Modal open={open} onClose={onClose} title="Add Contacts to List">
       <input
         type="text"
-        placeholder="Search by name, telegram, email…"
+        placeholder="Search by name, company, telegram, email…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         autoFocus
@@ -193,6 +191,8 @@ function AddContactModal({
             const isOutreach = OUTREACH_STATUSES.includes(c.status);
             const stageLabel = isOutreach ? (OUTREACH_LABELS[c.status] ?? c.status) : "In Pipeline";
             const inList = inListIds.has(c.id);
+            const displayName = c.companyName || c.name;
+            const subLine = c.companyName ? c.name : (c.telegramUsername ?? c.email ?? null);
             return (
               <button
                 key={c.id}
@@ -203,9 +203,8 @@ function AddContactModal({
                 )}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-zinc-900">{c.name}</p>
-                  {c.telegramUsername && <p className="truncate text-xs text-zinc-400">{c.telegramUsername}</p>}
-                  {!c.telegramUsername && c.email && <p className="truncate text-xs text-zinc-400">{c.email}</p>}
+                  <p className="truncate text-sm font-medium text-zinc-900">{displayName}</p>
+                  {subLine && <p className="truncate text-xs text-zinc-400">{subLine}</p>}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <span className="text-xs text-zinc-400">{stageLabel}</span>
@@ -248,6 +247,9 @@ export default function ListDetailPage() {
   const [filterStage, setFilterStage] = useState("");
   const [filterTier, setFilterTier] = useState("");
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkRemoving, setBulkRemoving] = useState(false);
+
   useEffect(() => { if (id) setActiveColumns(loadColumns(id)); }, [id]);
 
   const handleColumnsChange = (cols: ColumnKey[]) => {
@@ -255,7 +257,6 @@ export default function ListDetailPage() {
     if (id) saveColumns(id, cols);
   };
 
-  // Fetch list info + list contacts in parallel
   const loadPage = async () => {
     if (!id) return;
     const cachedList     = cacheGet<CrmList>(`list:${id}`);
@@ -309,14 +310,14 @@ export default function ListDetailPage() {
     });
   };
 
-  // ── Delete list ───────────────────────────────────────────────────────────
+  // ── Export / Delete ───────────────────────────────────────────────────────
   const exportCSV = () => {
-    const headers = ["Company", "POC Name", "Stage", "Telegram", "POC Username", "Email", "Tier", "Tags"];
+    const headers = ["Company", "POC Name", "Stage", "Telegram", "Email", "Tier", "Tags"];
     const rows = listContacts.map((lc) => {
       const c = lc.contact;
       return [
         c.companyName ?? "", c.name, lc.stageLabel,
-        c.telegramUsername ?? "", c.pocUsername ?? "",
+        c.telegramUsername ?? "",
         c.email ?? "", c.tier?.label ?? "",
         c.contactTags.map(({ tag }) => tag.name).join("; "),
       ];
@@ -339,6 +340,20 @@ export default function ListDetailPage() {
     router.push("/lists");
   };
 
+  // ── Bulk remove ───────────────────────────────────────────────────────────
+  const bulkRemove = async () => {
+    if (!selectedIds.size) return;
+    setBulkRemoving(true);
+    await Promise.all(
+      Array.from(selectedIds).map((cid) =>
+        fetch(`/api/lists/${id}/contacts/${cid}`, { method: "DELETE" })
+      )
+    );
+    setSelectedIds(new Set());
+    setBulkRemoving(false);
+    await refreshContacts();
+  };
+
   // ── Derived ───────────────────────────────────────────────────────────────
   const serverInListIds = new Set(listContacts.map((lc) => lc.contact.id));
   const stageOptions = Array.from(new Set(listContacts.map((lc) => lc.stageLabel)));
@@ -350,11 +365,40 @@ export default function ListDetailPage() {
     const c = lc.contact;
     const q = search.toLowerCase();
     return (
-      (!q || c.name.toLowerCase().includes(q) || (c.telegramUsername ?? "").toLowerCase().includes(q) || (c.email ?? "").toLowerCase().includes(q)) &&
+      (!q ||
+        c.name.toLowerCase().includes(q) ||
+        (c.companyName ?? "").toLowerCase().includes(q) ||
+        (c.telegramUsername ?? "").toLowerCase().includes(q) ||
+        (c.email ?? "").toLowerCase().includes(q)
+      ) &&
       (!filterStage || lc.stageLabel === filterStage) &&
       (!filterTier || c.tier?.id === filterTier)
     );
   });
+
+  const filteredIds = new Set(filtered.map((lc) => lc.contact.id));
+  const allFilteredSelected = filtered.length > 0 && filtered.every((lc) => selectedIds.has(lc.contact.id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredIds.forEach((cid) => next.delete(cid));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => new Set([...Array.from(prev), ...Array.from(filteredIds)]));
+    }
+  };
+
+  const toggleSelectOne = (contactId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(contactId)) next.delete(contactId); else next.add(contactId);
+      return next;
+    });
+  };
 
   const colLabel = (key: ColumnKey) => ALL_COLUMNS.find((c) => c.key === key)?.label ?? key;
 
@@ -420,10 +464,10 @@ export default function ListDetailPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
         <input
           type="text"
-          placeholder="Search name, telegram, email…"
+          placeholder="Search name, company, telegram, email…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="min-w-[220px] flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
@@ -438,6 +482,30 @@ export default function ListDetailPage() {
         </select>
       </div>
 
+      {/* Bulk action bar */}
+      {someSelected && (
+        <div className="mb-2 flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5">
+          <span className="text-sm font-medium text-indigo-700">
+            {selectedIds.size} selected
+          </span>
+          <button
+            onClick={bulkRemove}
+            disabled={bulkRemoving}
+            className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            <Trash2 size={12} />
+            {bulkRemoving ? "Removing…" : "Remove from list"}
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto rounded p-1 text-indigo-400 hover:text-indigo-700"
+            title="Clear selection"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="flex-1 overflow-auto rounded-lg border border-zinc-200 bg-white shadow-sm">
         {loading ? (
@@ -450,30 +518,55 @@ export default function ListDetailPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50 text-left">
+                <th className="w-10 px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={toggleSelectAll}
+                    className="h-3.5 w-3.5 rounded accent-indigo-600 cursor-pointer"
+                    title={allFilteredSelected ? "Deselect all" : "Select all"}
+                  />
+                </th>
                 <th className="px-4 py-3 font-medium text-zinc-500">Name</th>
                 {activeColumns.map((key) => <th key={key} className="px-4 py-3 font-medium text-zinc-500">{colLabel(key)}</th>)}
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
-              {filtered.map((lc) => (
-                <tr key={lc.contact.id} className="border-b border-zinc-50 hover:bg-zinc-50">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-zinc-900">{lc.contact.name}</div>
-                    {lc.contact.email && <div className="text-xs text-zinc-400">{lc.contact.email}</div>}
-                  </td>
-                  {activeColumns.map((key) => <td key={key} className="px-4 py-3">{renderCell(lc, key)}</td>)}
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => fetch(`/api/lists/${id}/contacts/${lc.contact.id}`, { method: "DELETE" }).then(refreshContacts)}
-                      title="Remove from list"
-                      className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((lc) => {
+                const isSelected = selectedIds.has(lc.contact.id);
+                const displayName = lc.contact.companyName || lc.contact.name;
+                const subName = lc.contact.companyName ? lc.contact.name : lc.contact.email;
+                return (
+                  <tr
+                    key={lc.contact.id}
+                    className={cn("border-b border-zinc-50 hover:bg-zinc-50", isSelected && "bg-indigo-50 hover:bg-indigo-50")}
+                  >
+                    <td className="w-10 px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectOne(lc.contact.id)}
+                        className="h-3.5 w-3.5 rounded accent-indigo-600 cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-zinc-900">{displayName}</div>
+                      {subName && <div className="text-xs text-zinc-400">{subName}</div>}
+                    </td>
+                    {activeColumns.map((key) => <td key={key} className="px-4 py-3">{renderCell(lc, key)}</td>)}
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => fetch(`/api/lists/${id}/contacts/${lc.contact.id}`, { method: "DELETE" }).then(refreshContacts)}
+                        title="Remove from list"
+                        className="rounded p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
