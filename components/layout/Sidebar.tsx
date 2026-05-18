@@ -5,9 +5,24 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard, Send, Kanban, SquareCheckBig, Settings,
-  List, Plus, Pencil, Trash2, Check, X, ChevronDown, LogOut, Bot,
+  List, Plus, Pencil, Trash2, Check, X, ChevronDown, LogOut, Bot, GripVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -21,6 +36,119 @@ interface CrmList { id: string; name: string; _count?: { contacts: number } }
 interface Counts  { contacts: number; deals: number; pendingTasks: number }
 interface Me      { name: string; email: string; role: string }
 
+// ─── Sortable list item ───────────────────────────────────────────────────────
+
+function SortableListItem({
+  list, active, isEditing, editName, editRef,
+  onStartEdit, onSaveEdit, onEditNameChange, onDelete,
+}: {
+  list: CrmList;
+  active: boolean;
+  isEditing: boolean;
+  editName: string;
+  editRef: React.RefObject<HTMLInputElement>;
+  onStartEdit: () => void;
+  onSaveEdit: () => void;
+  onEditNameChange: (v: string) => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: list.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    position: "relative",
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  const href = `/lists/${list.id}`;
+
+  return (
+    <div ref={setNodeRef} style={style} className="group relative flex items-center">
+      {/* Drag handle — visible on hover, not shown when editing */}
+      {!isEditing && (
+        <button
+          {...attributes}
+          {...listeners}
+          tabIndex={-1}
+          style={{
+            background: "transparent",
+            border: 0,
+            cursor: "grab",
+            padding: "4px 2px 4px 6px",
+            color: "#3A3E4A",
+            display: "inline-flex",
+            flexShrink: 0,
+            touchAction: "none",
+          }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Drag to reorder"
+        >
+          <GripVertical size={11} />
+        </button>
+      )}
+
+      {isEditing ? (
+        <div className="flex flex-1 items-center gap-1 px-3 py-1">
+          <input
+            ref={editRef}
+            value={editName}
+            onChange={(e) => onEditNameChange(e.target.value)}
+            onBlur={onSaveEdit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onSaveEdit();
+              if (e.key === "Escape") onEditNameChange("");
+            }}
+            style={{
+              flex: 1, minWidth: 0, background: "#1F2330",
+              border: "1px solid var(--brand)", borderRadius: 6,
+              padding: "3px 8px", fontSize: 12, color: "white", outline: "none",
+            }}
+          />
+        </div>
+      ) : (
+        <>
+          <Link
+            href={href}
+            className={cn("nav-item flex-1 pr-14", active && "active")}
+            style={{ textDecoration: "none", margin: "0 8px 0 0", paddingLeft: 6 }}
+          >
+            <List size={14} style={{ color: active ? "white" : "#6E7280", flexShrink: 0 }} />
+            <span className="flex-1 truncate">{list.name}</span>
+            {list._count != null && (
+              <span style={{ fontSize: 10, fontWeight: 500, fontFamily: "var(--font-mono, monospace)", color: active ? "white" : "#6E7280" }}>
+                {list._count.contacts}
+              </span>
+            )}
+          </Link>
+          <div
+            className="absolute right-2 hidden items-center gap-0.5 group-hover:flex"
+            style={{ background: "var(--ink)", paddingLeft: 4, borderRadius: 4 }}
+          >
+            <button
+              onClick={(e) => { e.preventDefault(); onStartEdit(); }}
+              style={{ background: "transparent", border: 0, cursor: "pointer", padding: 4, color: "#6E7280", display: "inline-flex" }}
+              className="hover:text-zinc-200 rounded"
+            >
+              <Pencil size={10} />
+            </button>
+            <button
+              onClick={(e) => { e.preventDefault(); onDelete(); }}
+              style={{ background: "transparent", border: 0, cursor: "pointer", padding: 4, color: "#6E7280", display: "inline-flex" }}
+              className="hover:text-red-400 rounded"
+            >
+              <Trash2 size={10} />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
@@ -33,6 +161,10 @@ export default function Sidebar() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName,  setEditName]  = useState("");
   const editRef = useRef<HTMLInputElement>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
 
   const fetchLists = async () => {
     const res = await fetch("/api/lists");
@@ -51,7 +183,7 @@ export default function Sidebar() {
     const name = newName.trim();
     if (!name) { setCreating(false); setNewName(""); return; }
     const tempId = `__tmp__${Date.now()}`;
-    setLists((p) => [{ id: tempId, name }, ...p]);
+    setLists((p) => [...p, { id: tempId, name }]);
     setNewName(""); setCreating(false);
     const res = await fetch("/api/lists", {
       method: "POST",
@@ -80,6 +212,20 @@ export default function Sidebar() {
     setLists((p) => p.filter((l) => l.id !== list.id));
     await fetch(`/api/lists/${list.id}`, { method: "DELETE" });
     if (pathname.startsWith(`/lists/${list.id}`)) router.push("/lists");
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = lists.findIndex((l) => l.id === active.id);
+    const newIndex = lists.findIndex((l) => l.id === over.id);
+    const reordered = arrayMove(lists, oldIndex, newIndex);
+    setLists(reordered);
+    fetch("/api/lists/reorder", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: reordered.map((l) => l.id) }),
+    });
   };
 
   return (
@@ -166,56 +312,34 @@ export default function Sidebar() {
           </div>
         )}
 
-        <div className="flex flex-col gap-0.5">
-          {lists.map((list) => {
-            const href   = `/lists/${list.id}`;
-            const active = pathname === href || pathname.startsWith(href + "/");
-            const isEditing = editingId === list.id;
-            return (
-              <div key={list.id} className="group relative flex items-center">
-                {isEditing ? (
-                  <div className="flex flex-1 items-center gap-1 px-3 py-1">
-                    <input ref={editRef} value={editName} onChange={(e) => setEditName(e.target.value)}
-                      onBlur={() => saveEdit(list.id)}
-                      onKeyDown={(e) => { if (e.key === "Enter") saveEdit(list.id); if (e.key === "Escape") setEditingId(null); }}
-                      style={{ flex: 1, minWidth: 0, background: "#1F2330", border: "1px solid var(--brand)", borderRadius: 6, padding: "3px 8px", fontSize: 12, color: "white", outline: "none" }}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <Link href={href}
-                      className={cn("nav-item flex-1 pr-14", active && "active")}
-                      style={{ textDecoration: "none", margin: "0 8px" }}>
-                      <List size={14} style={{ color: active ? "white" : "#6E7280", flexShrink: 0 }} />
-                      <span className="flex-1 truncate">{list.name}</span>
-                      {list._count != null && (
-                        <span style={{ fontSize: 10, fontWeight: 500, fontFamily: "var(--font-mono, monospace)", color: active ? "white" : "#6E7280" }}>
-                          {list._count.contacts}
-                        </span>
-                      )}
-                    </Link>
-                    <div className="absolute right-2 hidden items-center gap-0.5 group-hover:flex"
-                      style={{ background: "var(--ink)", paddingLeft: 4, borderRadius: 4 }}>
-                      <button onClick={(e) => { e.preventDefault(); setEditingId(list.id); setEditName(list.name); }}
-                        style={{ background: "transparent", border: 0, cursor: "pointer", padding: 4, color: "#6E7280", display: "inline-flex" }}
-                        className="hover:text-zinc-200 rounded">
-                        <Pencil size={10} />
-                      </button>
-                      <button onClick={(e) => { e.preventDefault(); deleteList(list); }}
-                        style={{ background: "transparent", border: 0, cursor: "pointer", padding: 4, color: "#6E7280", display: "inline-flex" }}
-                        className="hover:text-red-400 rounded">
-                        <Trash2 size={10} />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-          {lists.length === 0 && !creating && (
-            <p style={{ fontSize: 12, color: "#4A4E5A", padding: "4px 18px" }}>No lists yet</p>
-          )}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={lists.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+            <div className="flex flex-col gap-0.5">
+              {lists.map((list) => {
+                const href   = `/lists/${list.id}`;
+                const active = pathname === href || pathname.startsWith(href + "/");
+                const isEditing = editingId === list.id;
+                return (
+                  <SortableListItem
+                    key={list.id}
+                    list={list}
+                    active={active}
+                    isEditing={isEditing}
+                    editName={editName}
+                    editRef={editRef}
+                    onStartEdit={() => { setEditingId(list.id); setEditName(list.name); }}
+                    onSaveEdit={() => saveEdit(list.id)}
+                    onEditNameChange={setEditName}
+                    onDelete={() => deleteList(list)}
+                  />
+                );
+              })}
+              {lists.length === 0 && !creating && (
+                <p style={{ fontSize: 12, color: "#4A4E5A", padding: "4px 18px" }}>No lists yet</p>
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
       {/* Bottom */}
