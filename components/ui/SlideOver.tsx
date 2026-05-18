@@ -27,7 +27,7 @@ export default function SlideOver({ open, onClose, title, children }: Props) {
             animation: "slideInRight 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
           }}
         >
-          <div className="flex-1 overflow-y-auto scrollbar-thin">{children}</div>
+          <div className="flex-1 overflow-hidden flex flex-col">{children}</div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

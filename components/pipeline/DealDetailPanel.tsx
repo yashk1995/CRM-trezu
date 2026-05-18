@@ -404,7 +404,7 @@ export default function DealDetailPanel({ dealId, open, previewDeal, onClose, on
           )}
 
           {/* ── Panel top nav ──────────────────────────────────────── */}
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--cloud-2)" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--cloud-2)", flexShrink: 0 }}>
             <div className="flex items-center gap-2 mb-4">
               <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, background: "transparent", border: "1px solid var(--mist)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--stone)" }}>
                 <ChevronLeft size={14} />

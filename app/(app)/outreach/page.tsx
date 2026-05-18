@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cacheGet, cacheSet, cacheClearPrefix } from "@/lib/cache";
 import Link from "next/link";
 import { Plus, Search, ArrowRight, Pencil, Trash2, ExternalLink, ChevronDown, Download, X } from "lucide-react";
-import ContactFormModal      from "@/components/outreach/ContactFormModal";
-import MoveToPipelineModal   from "@/components/outreach/MoveToPipelineModal";
+import ContactFormModal          from "@/components/outreach/ContactFormModal";
+import MoveToPipelineModal       from "@/components/outreach/MoveToPipelineModal";
+import BulkMoveToPipelineModal   from "@/components/outreach/BulkMoveToPipelineModal";
 import ContactAvatar    from "@/components/ui/ContactAvatar";
 import Badge            from "@/components/ui/Badge";
 
@@ -52,9 +53,10 @@ export default function OutreachPage() {
   const [pipelineContact, setPipelineContact] = useState<Contact | null>(null);
 
   // Bulk selection
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkAction,  setBulkAction]  = useState<"list" | "status" | null>(null);
-  const [lists,       setLists]       = useState<{ id: string; name: string }[]>([]);
+  const [selectedIds,       setSelectedIds]       = useState<Set<string>>(new Set());
+  const [bulkAction,        setBulkAction]        = useState<"list" | "status" | null>(null);
+  const [lists,             setLists]             = useState<{ id: string; name: string }[]>([]);
+  const [bulkPipelineOpen,  setBulkPipelineOpen]  = useState(false);
   const bulkRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -332,6 +334,12 @@ export default function OutreachPage() {
             )}
           </div>
 
+          {/* Move to pipeline */}
+          <button onClick={() => setBulkPipelineOpen(true)}
+            className="btn sm" style={{ background: "#1F2330", color: "white", borderColor: "#2A2D36", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <ArrowRight size={13} /> Move to pipeline
+          </button>
+
           <button onClick={() => setSelectedIds(new Set())}
             style={{ background: "transparent", border: 0, color: "#A6AAB4", cursor: "pointer", fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
             <X size={12} /> Clear
@@ -464,6 +472,13 @@ export default function OutreachPage() {
         onClose={() => setPipelineContact(null)}
         contact={pipelineContact}
         onMoved={() => { fetchContacts(true); setPipelineContact(null); }}
+      />
+
+      <BulkMoveToPipelineModal
+        open={bulkPipelineOpen}
+        onClose={() => setBulkPipelineOpen(false)}
+        contacts={contacts.filter((c) => selectedIds.has(c.id))}
+        onMoved={() => { fetchContacts(true); setSelectedIds(new Set()); setBulkPipelineOpen(false); }}
       />
     </div>
   );
