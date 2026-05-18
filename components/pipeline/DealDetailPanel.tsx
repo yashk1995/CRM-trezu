@@ -123,6 +123,18 @@ export default function DealDetailPanel({ dealId, open, previewDeal, onClose, on
   const [pendingFiles, setPendingFiles] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Three-dots menu
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
   useEffect(() => {
     fetch("/api/custom-field-definitions?appliesTo=deal").then((r) => r.json()).then(setCustomFieldDefs);
     fetch("/api/users").then((r) => r.ok ? r.json() : []).then((users) =>
@@ -401,9 +413,28 @@ export default function DealDetailPanel({ dealId, open, previewDeal, onClose, on
                 Pipeline{deal.stage ? ` · ${deal.stage.name}` : ""}
               </span>
               <div style={{ flex: 1 }} />
-              <button style={{ width: 28, height: 28, borderRadius: 6, background: "transparent", border: "1px solid var(--mist)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--stone)" }}>
-                <MoreHorizontal size={14} />
-              </button>
+              <div ref={menuRef} style={{ position: "relative" }}>
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  style={{ width: 28, height: 28, borderRadius: 6, background: menuOpen ? "var(--cloud-2)" : "transparent", border: "1px solid var(--mist)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--stone)" }}
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+                {menuOpen && (
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, background: "var(--paper)", border: "1px solid var(--cloud-2)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", minWidth: 180, padding: "4px 0" }}>
+                    <button
+                      onClick={() => { setMenuOpen(false); removeFromPipeline(); }}
+                      disabled={removing}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--rose)", textAlign: "left" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--rose-wash)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                    >
+                      <Trash2 size={13} />
+                      {removing ? "Removing…" : "Remove from pipeline"}
+                    </button>
+                  </div>
+                )}
+              </div>
               <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, background: "transparent", border: "1px solid var(--mist)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--stone)" }}>
                 <X size={14} />
               </button>
